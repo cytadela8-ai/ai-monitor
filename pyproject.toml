@@ -1,0 +1,39 @@
+[build-system]
+requires = ["uv_build==0.11.6"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
+[project]
+name = "ai-monitor"
+version = "0.1.0"
+description = "Local dashboard for Codex and Claude AI usage"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "fastapi==0.135.3",
+  "jinja2==3.1.6",
+  "uvicorn==0.44.0",
+]
+
+[dependency-groups]
+dev = [
+  "httpx==0.28.1",
+  "pytest==9.0.3",
+  "ruff==0.15.10",
+  "ty==0.0.29",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ty.rules]
+unresolved-import = "error"
