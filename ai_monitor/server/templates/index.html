@@ -9,121 +9,156 @@
   </head>
   <body>
     <div class="backdrop"></div>
-    <main class="shell">
-      <section class="hero">
-        <p class="eyebrow">Local Activity Ledger</p>
-        <div class="hero-grid">
-          <div>
-            <h1>AI Monitor</h1>
-            <p class="lede">
-              Track how Codex and Claude activity clusters around your projects without shipping
-              any usage data off your machine.
-            </p>
-          </div>
-          <aside class="status-card">
+    <main
+      class="shell"
+      data-last-refresh="{{ last_refreshed_at or '' }}"
+    >
+      <header class="masthead">
+        <div class="masthead-copy">
+          <p class="eyebrow">Local AI Usage Ledger</p>
+          <h1>AI Monitor</h1>
+          <p class="lede">
+            A local-first ledger for Codex and Claude activity, grouped by project and time bucket
+            without shipping usage data off your machine.
+          </p>
+        </div>
+        <aside class="status-rail">
+          <div class="status-block">
             <span class="status-label">Last Refresh</span>
             <strong id="last-refresh">{{ last_refreshed_at or "Not refreshed yet" }}</strong>
-            <button id="refresh-button" type="button">Refresh Local Logs</button>
-            <p id="status-note" class="status-note">
-              The first visit now bootstraps the local cache automatically.
-            </p>
-          </aside>
+          </div>
+          <button id="refresh-button" type="button">Refresh Local Logs</button>
+          <p aria-atomic="true" aria-live="polite" id="status-note" class="status-note" role="status">
+            If no cache exists yet, the first scan starts automatically after the page loads.
+          </p>
+        </aside>
+      </header>
+
+      <section class="toolbar panel">
+        <div class="segment" aria-label="Period granularity" role="group">
+          <button
+            aria-pressed="true"
+            class="segment-button is-active"
+            data-period="day"
+            type="button"
+          >
+            Day
+          </button>
+          <button aria-pressed="false" class="segment-button" data-period="week" type="button">
+            Week
+          </button>
+          <button aria-pressed="false" class="segment-button" data-period="month" type="button">
+            Month
+          </button>
+        </div>
+        <div class="filter-row">
+          <label class="filter">
+            <span>Project</span>
+            <select id="project-filter">
+              <option value="">All Projects</option>
+            </select>
+          </label>
+          <label class="filter">
+            <span>Provider</span>
+            <select id="provider-filter">
+              <option value="">All Providers</option>
+              <option value="claude">Claude</option>
+              <option value="codex">Codex</option>
+            </select>
+          </label>
         </div>
       </section>
 
-      <section class="controls-panel">
-        <div class="segment" aria-label="Period granularity">
-          <button class="segment-button is-active" data-period="day" type="button">Day</button>
-          <button class="segment-button" data-period="week" type="button">Week</button>
-          <button class="segment-button" data-period="month" type="button">Month</button>
-        </div>
-        <label class="filter">
-          <span>Project</span>
-          <select id="project-filter">
-            <option value="">All Projects</option>
-          </select>
-        </label>
-        <label class="filter">
-          <span>Provider</span>
-          <select id="provider-filter">
-            <option value="">All Providers</option>
-            <option value="claude">Claude</option>
-            <option value="codex">Codex</option>
-          </select>
-        </label>
-      </section>
-
-      <section class="summary-grid">
-        <article class="summary-card">
+      <section aria-label="Usage totals" class="totals-strip">
+        <article class="total-block">
           <span class="metric-label">Conversations</span>
           <strong id="conversation-total">0</strong>
           <p class="metric-note">Distinct conversations in the selected view.</p>
         </article>
-        <article class="summary-card">
+        <article class="total-block">
           <span class="metric-label">Text Prompts</span>
           <strong id="text-prompt-total">0</strong>
           <p class="metric-note">Natural-language prompts sent to the model.</p>
         </article>
-        <article class="summary-card">
+        <article class="total-block">
           <span class="metric-label">Slash Commands</span>
           <strong id="slash-command-total">0</strong>
           <p class="metric-note">Command-style inputs such as `/clear` and `/permissions`.</p>
         </article>
       </section>
 
-      <section class="content-grid">
-        <article class="panel chart-panel">
+      <section aria-busy="false" class="workspace" id="workspace">
+        <article class="panel ledger-panel">
           <div class="panel-heading">
-            <h2>Activity Wave</h2>
-            <p>Recent buckets only, trimmed to keep dense timelines readable.</p>
+            <h2>Project Usage Ledger</h2>
+            <p>Period bucket, project, and provider totals from the local normalized cache.</p>
           </div>
-          <div id="chart" class="chart" aria-live="polite"></div>
+          <div class="table-wrap">
+            <table class="metrics-table">
+              <caption>
+                Aggregated AI usage metrics by period, project, and provider for the current
+                filter selection.
+              </caption>
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>Project</th>
+                  <th>Provider</th>
+                  <th>Conversations</th>
+                  <th>Text Prompts</th>
+                  <th>Slash Commands</th>
+                </tr>
+              </thead>
+              <tbody id="metrics-table-body"></tbody>
+            </table>
+          </div>
         </article>
 
-        <article class="panel diagnostics-panel">
-          <div class="panel-heading">
-            <h2>Refresh Diagnostics</h2>
-            <p>Latest rebuild metadata from the normalized cache.</p>
-          </div>
-          <dl class="diagnostics">
-            <div>
-              <dt>Providers</dt>
-              <dd id="provider-count">-</dd>
+        <div class="sidebar-stack">
+          <article class="panel chart-panel">
+            <div class="panel-heading">
+              <h2>Activity Wave</h2>
+              <p>Recent buckets only, with a visible event scale and hoverable point values.</p>
             </div>
-            <div>
-              <dt>Conversations</dt>
-              <dd id="diagnostic-conversations">-</dd>
+            <p id="chart-summary" class="chart-summary">
+              Activity summary will appear here after the chart data loads.
+            </p>
+            <div class="chart-canvas-wrap">
+              <canvas
+                aria-label="Recent activity chart"
+                id="chart-canvas"
+                role="img"
+              ></canvas>
             </div>
-            <div>
-              <dt>Prompt Events</dt>
-              <dd id="diagnostic-prompts">-</dd>
-            </div>
-          </dl>
-        </article>
-      </section>
+            <p aria-live="polite" class="chart-hover-value" id="chart-hover-value">
+              Hover a point to inspect the exact value.
+            </p>
+          </article>
 
-      <section class="panel table-panel">
-        <div class="panel-heading">
-          <h2>Project Usage Ledger</h2>
-          <p>Aggregated usage grouped by project and selected time bucket.</p>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Period</th>
-                <th>Project</th>
-                <th>Provider</th>
-                <th>Conversations</th>
-                <th>Text Prompts</th>
-                <th>Slash Commands</th>
-              </tr>
-            </thead>
-            <tbody id="metrics-table-body"></tbody>
-          </table>
+          <article class="panel diagnostics-panel">
+            <div class="panel-heading">
+              <h2>Refresh Diagnostics</h2>
+              <p>Latest rebuild metadata from the normalized cache.</p>
+            </div>
+            <dl class="diagnostics">
+              <div>
+                <dt>Providers</dt>
+                <dd id="provider-count">-</dd>
+              </div>
+              <div>
+                <dt>Conversations</dt>
+                <dd id="diagnostic-conversations">-</dd>
+              </div>
+              <div>
+                <dt>Prompt Events</dt>
+                <dd id="diagnostic-prompts">-</dd>
+              </div>
+            </dl>
+          </article>
         </div>
       </section>
     </main>
+    <script src="{{ url_for('static', path='vendor/chart.umd.js') }}" defer></script>
     <script src="{{ url_for('static', path='app.js') }}" defer></script>
   </body>
 </html>

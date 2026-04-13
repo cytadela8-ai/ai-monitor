@@ -31,14 +31,18 @@ uv run uvicorn ai_monitor.server.app:app --reload --port 8001
 ```
 
 Then open `http://127.0.0.1:8000` or the alternate port you selected. The app now initializes the
-SQLite schema automatically and bootstraps the first refresh on initial load, so a fresh checkout
-does not require a manual warm-up step.
+SQLite schema automatically. If the cache is empty, the page loads immediately and starts the
+first local scan in the background, so a fresh checkout does not require a manual warm-up step and
+the first request does not block on ingestion.
 
 ## Refresh Data
 
 Use the dashboard refresh button or the `POST /api/refresh` endpoint to rebuild normalized usage
 data from the local logs. Aggregates are rebuilt into a local SQLite cache and then served to the
-dashboard from there.
+dashboard from there. On narrow screens, the project ledger collapses into stacked row cards
+instead of relying on horizontal scrolling, and the status rail announces scan progress as the
+local cache loads or refreshes. The `Activity Wave` panel uses a local vendored Chart.js bundle,
+so the graph renders with explicit axes and hover tooltips without depending on a CDN.
 
 ## Default Sources
 

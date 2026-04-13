@@ -5,3 +5,4 @@ __pycache__/
 .ty/
 *.pyc
 ai_monitor.db
+.playwright-mcp/

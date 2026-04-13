@@ -1,18 +1,9 @@
 from fastapi import APIRouter, Query, Request
+from fastapi.responses import FileResponse
 
-from ai_monitor.db.queries import RefreshRunRow, fetch_latest_refresh_run, fetch_metrics_rows
+from ai_monitor.db.queries import fetch_latest_refresh_run, fetch_metrics_rows
 
 router = APIRouter()
-
-
-def _ensure_usage_data(request: Request) -> RefreshRunRow | None:
-    config = request.app.state.config
-    last_refresh = fetch_latest_refresh_run(config.database_path)
-    if last_refresh is not None:
-        return last_refresh
-
-    request.app.state.ingestion_service.refresh()
-    return fetch_latest_refresh_run(config.database_path)
 
 
 @router.get("/api/metrics")
@@ -23,7 +14,7 @@ def get_metrics(
     provider: str | None = Query(default=None),
 ) -> dict[str, object]:
     config = request.app.state.config
-    last_refresh = _ensure_usage_data(request)
+    last_refresh = fetch_latest_refresh_run(config.database_path)
     rows = fetch_metrics_rows(
         database_path=config.database_path,
         period=period,
@@ -54,10 +45,16 @@ def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@router.api_route("/favicon.ico", methods=["GET", "HEAD"])
+def favicon(request: Request) -> FileResponse:
+    static_path = request.app.state.static_path
+    return FileResponse(static_path / "favicon.svg", media_type="image/svg+xml")
+
+
 @router.get("/")
 def dashboard(request: Request) -> object:
     templates = request.app.state.templates
-    last_refresh = _ensure_usage_data(request)
+    last_refresh = fetch_latest_refresh_run(request.app.state.config.database_path)
     return templates.TemplateResponse(
         request=request,
         name="index.html",

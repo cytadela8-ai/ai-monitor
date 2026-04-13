@@ -43,6 +43,8 @@ tests/
 2. Ingestion service normalizes records.
 3. SQLite stores conversations, prompt events, and aggregate metrics.
 4. FastAPI reads aggregate metrics for the dashboard.
+5. The browser triggers the first refresh only when the cache is empty, so request handlers stay
+   read-only and initial page rendering is not blocked by ingestion.
 
 ## Provider Boundaries
 
@@ -50,3 +52,15 @@ tests/
 - `CodexProvider` joins Codex history with session metadata to recover project paths.
 - `IngestionService` does not know provider-specific file formats.
 - `server` code does not read raw history files directly.
+
+## Dashboard Notes
+
+- The main surface is the project usage ledger. Totals, chart, and diagnostics are secondary
+  support views rather than separate dashboard cards.
+- `Activity Wave` is rendered with a pinned local `Chart.js 4.5.1` bundle in
+  `ai_monitor/server/static/vendor/chart.umd.js` so the dashboard keeps a proper charting library
+  without introducing a Node build step or external runtime dependency.
+- Mobile adapts the ledger into stacked row cards using the same table data, avoiding horizontal
+  scrolling while keeping the same metrics visible, including under enlarged text.
+- The client keeps refresh state in the browser, exposes it through a live status region, and
+  avoids unnecessary project-filter and table DOM rewrites when the rendered data has not changed.

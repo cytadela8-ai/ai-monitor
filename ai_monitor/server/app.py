@@ -18,6 +18,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     ensure_database(app_config.database_path)
     app = FastAPI(title="AI Monitor")
     app.state.config = app_config
+    app.state.static_path = server_root / "static"
     app.state.templates = Jinja2Templates(directory=str(server_root / "templates"))
     app.state.ingestion_service = IngestionService(
         database_path=app_config.database_path,
@@ -29,7 +30,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
             ),
         ],
     )
-    app.mount("/static", StaticFiles(directory=server_root / "static"), name="static")
+    app.mount("/static", StaticFiles(directory=app.state.static_path), name="static")
     app.include_router(router)
     return app
 

@@ -92,7 +92,7 @@ def fetch_metrics_rows(
                 slash_command_count
             FROM aggregate_metrics
             WHERE {where_sql}
-            ORDER BY period_start, project_name, provider
+            ORDER BY period_start DESC, project_name, provider
             """,
             params,
         ).fetchall()
