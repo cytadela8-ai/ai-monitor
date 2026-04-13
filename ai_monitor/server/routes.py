@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse
 
 from ai_monitor.db.queries import fetch_latest_refresh_run, fetch_metrics_rows
 
@@ -44,6 +43,15 @@ def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@router.get("/", response_class=HTMLResponse)
-def dashboard() -> str:
-    return "<html><body><h1>AI Monitor</h1></body></html>"
+@router.get("/")
+def dashboard(request: Request) -> object:
+    templates = request.app.state.templates
+    config = request.app.state.config
+    last_refresh = fetch_latest_refresh_run(config.database_path)
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={
+            "last_refreshed_at": None if last_refresh is None else last_refresh.refreshed_at,
+        },
+    )

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Monitor</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}" />
+  </head>
+  <body>
+    <div class="backdrop"></div>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">Local Activity Ledger</p>
+        <div class="hero-grid">
+          <div>
+            <h1>AI Monitor</h1>
+            <p class="lede">
+              Track how Codex and Claude activity clusters around your projects without shipping
+              any usage data off your machine.
+            </p>
+          </div>
+          <aside class="status-card">
+            <span class="status-label">Last Refresh</span>
+            <strong id="last-refresh">{{ last_refreshed_at or "Not refreshed yet" }}</strong>
+            <button id="refresh-button" type="button">Refresh Local Logs</button>
+          </aside>
+        </div>
+      </section>
+
+      <section class="controls-panel">
+        <div class="segment" aria-label="Period granularity">
+          <button class="segment-button is-active" data-period="day" type="button">Day</button>
+          <button class="segment-button" data-period="week" type="button">Week</button>
+          <button class="segment-button" data-period="month" type="button">Month</button>
+        </div>
+        <label class="filter">
+          <span>Project</span>
+          <select id="project-filter">
+            <option value="">All Projects</option>
+          </select>
+        </label>
+        <label class="filter">
+          <span>Provider</span>
+          <select id="provider-filter">
+            <option value="">All Providers</option>
+            <option value="claude">Claude</option>
+            <option value="codex">Codex</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="summary-grid">
+        <article class="summary-card">
+          <span class="metric-label">Conversations</span>
+          <strong id="conversation-total">0</strong>
+        </article>
+        <article class="summary-card">
+          <span class="metric-label">Text Prompts</span>
+          <strong id="text-prompt-total">0</strong>
+        </article>
+        <article class="summary-card">
+          <span class="metric-label">Slash Commands</span>
+          <strong id="slash-command-total">0</strong>
+        </article>
+      </section>
+
+      <section class="content-grid">
+        <article class="panel chart-panel">
+          <div class="panel-heading">
+            <h2>Activity Wave</h2>
+            <p>Daily, weekly, or monthly total activity for the selected scope.</p>
+          </div>
+          <div id="chart" class="chart" aria-live="polite"></div>
+        </article>
+
+        <article class="panel diagnostics-panel">
+          <div class="panel-heading">
+            <h2>Refresh Diagnostics</h2>
+            <p>Latest rebuild metadata from the normalized cache.</p>
+          </div>
+          <dl class="diagnostics">
+            <div>
+              <dt>Providers</dt>
+              <dd id="provider-count">-</dd>
+            </div>
+            <div>
+              <dt>Conversations</dt>
+              <dd id="diagnostic-conversations">-</dd>
+            </div>
+            <div>
+              <dt>Prompt Events</dt>
+              <dd id="diagnostic-prompts">-</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <section class="panel table-panel">
+        <div class="panel-heading">
+          <h2>Project Usage Ledger</h2>
+          <p>Aggregated usage grouped by project and selected time bucket.</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>Project</th>
+                <th>Provider</th>
+                <th>Conversations</th>
+                <th>Text Prompts</th>
+                <th>Slash Commands</th>
+              </tr>
+            </thead>
+            <tbody id="metrics-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <script src="{{ url_for('static', path='app.js') }}" defer></script>
+  </body>
+</html>
