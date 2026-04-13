@@ -42,6 +42,7 @@ def test_dashboard_exposes_accessible_controls_and_table_context(client: TestCli
     assert "<caption>" in body
     assert 'id="chart-summary"' in body
     assert 'class="totals-strip"' in body
+    assert 'class="summary-chip"' in body
     assert 'aria-live="polite"' in body
     assert 'role="status"' in body
     assert 'class="metrics-table"' in body
@@ -49,6 +50,7 @@ def test_dashboard_exposes_accessible_controls_and_table_context(client: TestCli
     assert 'id="chart-canvas"' in body
     assert 'id="chart-hover-value"' in body
     assert 'static/vendor/chart.umd.js' in body
+    assert 'class="diagnostics-shell"' in body
 
 
 def test_fresh_dashboard_marks_cache_as_missing(fresh_client: TestClient) -> None:

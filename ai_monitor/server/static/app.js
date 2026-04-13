@@ -141,9 +141,9 @@ function setWorkspaceBusy(isBusy) {
 
 function defaultStatusNote() {
   if (!state.latestRefresh) {
-    return "No cached data yet. The first local scan will start automatically.";
+    return "No local scan yet. The page will build one automatically.";
   }
-  return "Viewing normalized local data from the latest completed scan.";
+  return "Using the latest local scan.";
 }
 
 function setBusy(isBusy, label = "Refresh Local Logs", busyMessage = "") {
@@ -383,7 +383,7 @@ function renderChart(rows) {
     return entry[1] > highest[1] ? entry : highest;
   });
   setChartSummary(
-    `Showing ${entries.length} recent periods. The y-axis tracks total prompt events, and the peak was ${peakEntry[1]} on ${formatPeriodLabel(peakEntry[0])}.`
+    `Showing ${entries.length} recent periods. Peak burst: ${peakEntry[1]} events on ${formatPeriodLabel(peakEntry[0])}.`
   );
   setChartHoverValue("Hover a point to inspect the exact value.");
 

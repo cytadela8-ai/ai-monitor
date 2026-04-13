@@ -18,8 +18,7 @@
           <p class="eyebrow">Local AI Usage Ledger</p>
           <h1>AI Monitor</h1>
           <p class="lede">
-            A local-first ledger for Codex and Claude activity, grouped by project and time bucket
-            without shipping usage data off your machine.
+            Track where your AI time goes across projects without shipping your logs off-machine.
           </p>
         </div>
         <aside class="status-rail">
@@ -70,28 +69,27 @@
       </section>
 
       <section aria-label="Usage totals" class="totals-strip">
-        <article class="total-block">
-          <span class="metric-label">Conversations</span>
-          <strong id="conversation-total">0</strong>
-          <p class="metric-note">Distinct conversations in the selected view.</p>
-        </article>
-        <article class="total-block">
-          <span class="metric-label">Text Prompts</span>
-          <strong id="text-prompt-total">0</strong>
-          <p class="metric-note">Natural-language prompts sent to the model.</p>
-        </article>
-        <article class="total-block">
-          <span class="metric-label">Slash Commands</span>
-          <strong id="slash-command-total">0</strong>
-          <p class="metric-note">Command-style inputs such as `/clear` and `/permissions`.</p>
-        </article>
+        <p class="summary-ribbon">
+          <span class="summary-chip">
+            <strong id="conversation-total">0</strong>
+            <span>Conversations</span>
+          </span>
+          <span class="summary-chip">
+            <strong id="text-prompt-total">0</strong>
+            <span>Text Prompts</span>
+          </span>
+          <span class="summary-chip">
+            <strong id="slash-command-total">0</strong>
+            <span>Slash Commands</span>
+          </span>
+        </p>
       </section>
 
       <section aria-busy="false" class="workspace" id="workspace">
         <article class="panel ledger-panel">
           <div class="panel-heading">
             <h2>Project Usage Ledger</h2>
-            <p>Period bucket, project, and provider totals from the local normalized cache.</p>
+            <p>Newest first. Filter by project or tool when you want to zoom in.</p>
           </div>
           <div class="table-wrap">
             <table class="metrics-table">
@@ -115,10 +113,10 @@
         </article>
 
         <div class="sidebar-stack">
-          <article class="panel chart-panel">
+          <article class="panel chart-panel chart-panel--bare">
             <div class="panel-heading">
               <h2>Activity Wave</h2>
-              <p>Recent buckets only, with a visible event scale and hoverable point values.</p>
+              <p>Recent prompt bursts with a real event scale.</p>
             </div>
             <p id="chart-summary" class="chart-summary">
               Activity summary will appear here after the chart data loads.
@@ -135,11 +133,8 @@
             </p>
           </article>
 
-          <article class="panel diagnostics-panel">
-            <div class="panel-heading">
-              <h2>Refresh Diagnostics</h2>
-              <p>Latest rebuild metadata from the normalized cache.</p>
-            </div>
+          <details class="diagnostics-shell">
+            <summary>Scan details</summary>
             <dl class="diagnostics">
               <div>
                 <dt>Providers</dt>
@@ -154,7 +149,7 @@
                 <dd id="diagnostic-prompts">-</dd>
               </div>
             </dl>
-          </article>
+          </details>
         </div>
       </section>
     </main>
