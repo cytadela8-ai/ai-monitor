@@ -24,6 +24,7 @@ def get_metrics(
         "period": period,
         "rows": [row.__dict__ for row in rows],
         "last_refreshed_at": None if last_refresh is None else last_refresh.refreshed_at,
+        "refresh": None if last_refresh is None else last_refresh.__dict__,
     }
 
 

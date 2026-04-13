@@ -128,6 +128,7 @@ async function loadMetrics() {
   const response = await fetch(`/api/metrics?${params.toString()}`);
   const payload = await response.json();
   state.latestRefresh = payload.last_refreshed_at;
+  state.diagnostics = payload.refresh;
   renderProjects(payload.rows);
   renderSummary(payload.rows);
   renderTable(payload.rows);

@@ -18,6 +18,9 @@ class CodexProvider:
         conversation_times: dict[str, datetime] = {}
         prompt_events: list[PromptEventRecord] = []
 
+        if not self.history_path.exists():
+            return ProviderLoadResult(conversations=[], prompt_events=[])
+
         with self.history_path.open("r", encoding="utf-8") as handle:
             for line in handle:
                 if not line.strip():
@@ -60,6 +63,9 @@ class CodexProvider:
 
     def _load_session_paths(self) -> dict[str, str | None]:
         session_paths: dict[str, str | None] = {}
+        if not self.sessions_root.exists():
+            return session_paths
+
         for session_file in sorted(self.sessions_root.rglob("*.jsonl")):
             with session_file.open("r", encoding="utf-8") as handle:
                 for line in handle:

@@ -55,6 +55,9 @@ class ClaudeProvider:
         return ProviderLoadResult(conversations=conversations, prompt_events=prompt_events)
 
     def _read_records(self) -> Iterable[dict[str, object]]:
+        if not self.history_path.exists():
+            return
+
         with self.history_path.open("r", encoding="utf-8") as handle:
             for line in handle:
                 if line.strip():

@@ -27,10 +27,21 @@ runs.
 ## Refresh Data
 
 Use the dashboard refresh button or the `POST /api/refresh` endpoint to rebuild normalized usage
-data from the local logs.
+data from the local logs. Aggregates are rebuilt into a local SQLite cache and then served to the
+dashboard from there.
 
-## Planned Sources
+## Default Sources
 
 - `~/.claude/history.jsonl`
 - `~/.codex/history.jsonl`
 - `~/.codex/sessions/**/*.jsonl`
+
+If one of these sources is missing on the current machine, refresh still succeeds and ingests the
+sources that are present.
+
+## API Endpoints
+
+- `GET /` dashboard
+- `GET /api/metrics?period=day|week|month`
+- `POST /api/refresh`
+- `GET /health`
