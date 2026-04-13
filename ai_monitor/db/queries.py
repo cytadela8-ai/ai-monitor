@@ -2,6 +2,8 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
+from ai_monitor.db.schema import ensure_database
+
 
 @dataclass(frozen=True)
 class AggregateRow:
@@ -23,6 +25,7 @@ class RefreshRunRow:
 
 
 def fetch_aggregate_rows(database_path: Path) -> list[AggregateRow]:
+    ensure_database(database_path)
     connection = sqlite3.connect(database_path)
     try:
         rows = connection.execute(
@@ -62,6 +65,7 @@ def fetch_metrics_rows(
     project: str | None = None,
     provider: str | None = None,
 ) -> list[AggregateRow]:
+    ensure_database(database_path)
     where_clauses = ["period_type = ?"]
     params: list[str] = [period]
 
@@ -110,6 +114,7 @@ def fetch_metrics_rows(
 
 
 def fetch_latest_refresh_run(database_path: Path) -> RefreshRunRow | None:
+    ensure_database(database_path)
     connection = sqlite3.connect(database_path)
     try:
         row = connection.execute(

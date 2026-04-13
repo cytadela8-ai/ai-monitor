@@ -26,3 +26,9 @@ def client(app_config: AppConfig) -> TestClient:
     app = create_app(app_config)
     app.state.ingestion_service.refresh()
     return TestClient(app)
+
+
+@pytest.fixture
+def fresh_client(app_config: AppConfig) -> TestClient:
+    app = create_app(app_config)
+    return TestClient(app)

@@ -26,3 +26,12 @@ def test_refresh_then_query_returns_fixture_metrics(client: TestClient) -> None:
 
     assert payload["refresh"]["provider_count"] == 2
     assert any(row["project_name"] == "zk-chains-registry" for row in payload["rows"])
+
+
+def test_metrics_endpoint_bootstraps_data_on_first_request(fresh_client: TestClient) -> None:
+    response = fresh_client.get("/api/metrics", params={"period": "day"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["refresh"]["provider_count"] == 2
+    assert payload["rows"]

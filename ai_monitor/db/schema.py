@@ -1,4 +1,5 @@
 import sqlite3
+from pathlib import Path
 
 
 def create_schema(connection: sqlite3.Connection) -> None:
@@ -54,3 +55,12 @@ def clear_normalized_tables(connection: sqlite3.Connection) -> None:
         DELETE FROM conversations;
         """
     )
+
+
+def ensure_database(database_path: Path) -> None:
+    connection = sqlite3.connect(database_path)
+    try:
+        with connection:
+            create_schema(connection)
+    finally:
+        connection.close()

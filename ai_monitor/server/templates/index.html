@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AI Monitor</title>
+    <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}" type="image/svg+xml" />
     <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}" />
   </head>
   <body>
@@ -23,6 +24,9 @@
             <span class="status-label">Last Refresh</span>
             <strong id="last-refresh">{{ last_refreshed_at or "Not refreshed yet" }}</strong>
             <button id="refresh-button" type="button">Refresh Local Logs</button>
+            <p id="status-note" class="status-note">
+              The first visit now bootstraps the local cache automatically.
+            </p>
           </aside>
         </div>
       </section>
@@ -53,14 +57,17 @@
         <article class="summary-card">
           <span class="metric-label">Conversations</span>
           <strong id="conversation-total">0</strong>
+          <p class="metric-note">Distinct conversations in the selected view.</p>
         </article>
         <article class="summary-card">
           <span class="metric-label">Text Prompts</span>
           <strong id="text-prompt-total">0</strong>
+          <p class="metric-note">Natural-language prompts sent to the model.</p>
         </article>
         <article class="summary-card">
           <span class="metric-label">Slash Commands</span>
           <strong id="slash-command-total">0</strong>
+          <p class="metric-note">Command-style inputs such as `/clear` and `/permissions`.</p>
         </article>
       </section>
 
@@ -68,7 +75,7 @@
         <article class="panel chart-panel">
           <div class="panel-heading">
             <h2>Activity Wave</h2>
-            <p>Daily, weekly, or monthly total activity for the selected scope.</p>
+            <p>Recent buckets only, trimmed to keep dense timelines readable.</p>
           </div>
           <div id="chart" class="chart" aria-live="polite"></div>
         </article>

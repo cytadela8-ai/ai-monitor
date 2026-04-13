@@ -4,6 +4,7 @@ const state = {
   provider: "",
   latestRefresh: null,
   diagnostics: null,
+  loading: false,
 };
 
 function sumBy(rows, field) {
@@ -18,6 +19,39 @@ function setText(id, value) {
   const node = document.getElementById(id);
   if (node) {
     node.textContent = value;
+  }
+}
+
+function formatTimestamp(value) {
+  if (!value) {
+    return "Not refreshed yet";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function setBusy(isBusy, label) {
+  state.loading = isBusy;
+  const refreshButton = document.getElementById("refresh-button");
+  const statusNote = document.getElementById("status-note");
+  if (refreshButton) {
+    refreshButton.disabled = isBusy;
+    refreshButton.textContent = isBusy ? label : "Refresh Local Logs";
+  }
+  if (statusNote) {
+    statusNote.textContent = isBusy
+      ? "Scanning local Codex and Claude logs..."
+      : "The first visit now bootstraps the local cache automatically.";
+  }
+}
+
+function setStatusNote(message) {
+  const statusNote = document.getElementById("status-note");
+  if (statusNote) {
+    statusNote.textContent = message;
   }
 }
 
@@ -70,15 +104,17 @@ function renderChart(rows) {
     );
   }
 
-  const values = [...grouped.values()];
+  const entries = [...grouped.entries()].slice(-12);
+  const values = entries.map(([, value]) => value);
   const maxValue = Math.max(...values, 1);
-  chart.innerHTML = [...grouped.entries()]
+  chart.innerHTML = entries
     .map(([label, value]) => {
       const height = Math.max(12, Math.round((value / maxValue) * 180));
+      const shortLabel = label.slice(5);
       return `
         <div class="chart-bar">
-          <div class="chart-bar-fill" style="height:${height}px"></div>
-          <span class="chart-bar-label">${label}</span>
+          <div class="chart-bar-fill" style="height:${height}px" title="${label}: ${value} events"></div>
+          <span class="chart-bar-label" title="${label}">${shortLabel}</span>
         </div>
       `;
     })
@@ -113,35 +149,50 @@ function renderDiagnostics() {
   setText("provider-count", String(state.diagnostics.provider_count));
   setText("diagnostic-conversations", String(state.diagnostics.conversation_count));
   setText("diagnostic-prompts", String(state.diagnostics.prompt_event_count));
-  setText("last-refresh", state.latestRefresh ?? "Not refreshed yet");
+  setText("last-refresh", formatTimestamp(state.latestRefresh));
 }
 
 async function loadMetrics() {
-  const params = new URLSearchParams({ period: state.period });
-  if (state.project) {
-    params.set("project", state.project);
-  }
-  if (state.provider) {
-    params.set("provider", state.provider);
-  }
+  setBusy(true, "Loading Activity");
+  try {
+    const params = new URLSearchParams({ period: state.period });
+    if (state.project) {
+      params.set("project", state.project);
+    }
+    if (state.provider) {
+      params.set("provider", state.provider);
+    }
 
-  const response = await fetch(`/api/metrics?${params.toString()}`);
-  const payload = await response.json();
-  state.latestRefresh = payload.last_refreshed_at;
-  state.diagnostics = payload.refresh;
-  renderProjects(payload.rows);
-  renderSummary(payload.rows);
-  renderTable(payload.rows);
-  renderChart(payload.rows);
-  renderDiagnostics();
+    const response = await fetch(`/api/metrics?${params.toString()}`);
+    const payload = await response.json();
+    state.latestRefresh = payload.last_refreshed_at;
+    state.diagnostics = payload.refresh;
+    renderProjects(payload.rows);
+    renderSummary(payload.rows);
+    renderTable(payload.rows);
+    renderChart(payload.rows);
+    renderDiagnostics();
+  } catch (error) {
+    console.error(error);
+    setStatusNote("Loading failed. Try refreshing the local logs again.");
+  } finally {
+    setBusy(false, "Refresh Local Logs");
+  }
 }
 
 async function refreshData() {
-  const response = await fetch("/api/refresh", { method: "POST" });
-  state.diagnostics = await response.json();
-  state.latestRefresh = state.diagnostics.last_refreshed_at;
-  renderDiagnostics();
-  await loadMetrics();
+  setBusy(true, "Refreshing");
+  try {
+    const response = await fetch("/api/refresh", { method: "POST" });
+    state.diagnostics = await response.json();
+    state.latestRefresh = state.diagnostics.last_refreshed_at;
+    renderDiagnostics();
+    await loadMetrics();
+  } catch (error) {
+    console.error(error);
+    setStatusNote("Refresh failed. Check the server log and try again.");
+    setBusy(false, "Refresh Local Logs");
+  }
 }
 
 function bindControls() {

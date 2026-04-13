@@ -24,6 +24,16 @@ uv run uvicorn ai_monitor.server.app:app --reload
 The dashboard is served locally and reads Codex and Claude usage logs from the machine where it
 runs.
 
+If port `8000` is already in use, pick another one explicitly:
+
+```bash
+uv run uvicorn ai_monitor.server.app:app --reload --port 8001
+```
+
+Then open `http://127.0.0.1:8000` or the alternate port you selected. The app now initializes the
+SQLite schema automatically and bootstraps the first refresh on initial load, so a fresh checkout
+does not require a manual warm-up step.
+
 ## Refresh Data
 
 Use the dashboard refresh button or the `POST /api/refresh` endpoint to rebuild normalized usage
