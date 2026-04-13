@@ -42,7 +42,9 @@ data from the local logs. Aggregates are rebuilt into a local SQLite cache and t
 dashboard from there. On narrow screens, the project ledger collapses into stacked row cards
 instead of relying on horizontal scrolling, and the status rail announces scan progress as the
 local cache loads or refreshes. The `Activity Wave` panel uses a local vendored Chart.js bundle,
-so the graph renders with explicit axes and hover tooltips without depending on a CDN.
+so the graph renders with explicit axes and hover tooltips without depending on a CDN. The project
+picker is ranked by recent activity, and the toolbar exposes one-click project quick picks for the
+most active current projects.
 
 ## Default Sources
 

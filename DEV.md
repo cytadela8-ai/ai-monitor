@@ -60,6 +60,9 @@ tests/
 - `Activity Wave` is rendered with a pinned local `Chart.js 4.5.1` bundle in
   `ai_monitor/server/static/vendor/chart.umd.js` so the dashboard keeps a proper charting library
   without introducing a Node build step or external runtime dependency.
+- `GET /api/metrics` also returns ranked project options for the current period/provider context so
+  the client can keep the project picker stable and expose one-click project quick picks without
+  recomputing rankings in the browser.
 - Mobile adapts the ledger into stacked row cards using the same table data, avoiding horizontal
   scrolling while keeping the same metrics visible, including under enlarged text.
 - The client keeps refresh state in the browser, exposes it through a live status region, and

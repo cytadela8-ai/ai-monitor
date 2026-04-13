@@ -152,6 +152,54 @@ h2 {
   gap: 14px;
 }
 
+.project-quick-picks {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.quick-picks-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.project-quick-pick {
+  display: inline-flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 7px 11px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-muted) 76%, transparent);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+}
+
+.project-quick-pick strong {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.project-quick-pick.is-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 92%, transparent);
+}
+
+.project-quick-pick:hover,
+.project-quick-pick:focus-visible {
+  transform: translateY(-1px);
+}
+
+.project-quick-pick:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+
 .segment {
   display: inline-flex;
   gap: 8px;
@@ -502,6 +550,12 @@ canvas#chart-canvas {
   .filter,
   .filter select {
     width: 100%;
+  }
+
+  .project-quick-picks {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
   }
 
   .totals-strip {

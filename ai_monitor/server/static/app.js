@@ -5,7 +5,7 @@ const state = {
   loading: false,
   period: "day",
   project: "",
-  projectSignature: "",
+  projectOptionsSignature: "",
   provider: "",
   renderToken: 0,
   tableMarkup: "",
@@ -19,6 +19,8 @@ const TABLE_COLUMNS = [
   ["Text Prompts", "text_prompt_count"],
   ["Slash Commands", "slash_command_count"],
 ];
+
+const DEMOTED_PROJECTS = new Set([".codex", "tmp", "unknown"]);
 
 function escapeHtml(value) {
   return String(value)
@@ -159,6 +161,10 @@ function setBusy(isBusy, label = "Refresh Local Logs", busyMessage = "") {
     control.disabled = isBusy;
   }
 
+  for (const control of document.querySelectorAll(".project-quick-pick")) {
+    control.disabled = isBusy;
+  }
+
   if (isBusy && busyMessage) {
     setStatusNote(busyMessage);
   }
@@ -171,7 +177,7 @@ function setChartSummary(message) {
   }
 }
 
-function setChartHoverValue(message = "Hover a bar to inspect the exact value.") {
+function setChartHoverValue(message = "Hover a point to inspect the exact value.") {
   const hoverValue = document.getElementById("chart-hover-value");
   if (hoverValue) {
     hoverValue.textContent = message;
@@ -397,31 +403,102 @@ function renderChart(rows) {
   state.chart = new Chart(canvas, chartConfig(entries));
 }
 
-function renderProjects(rows) {
+function renderProjectOptions(projects) {
   const select = document.getElementById("project-filter");
   if (!select) {
     return;
   }
 
   const currentValue = state.project;
-  const projectNames = [...new Set(rows.map((row) => row.project_name))];
-  if (currentValue && !projectNames.includes(currentValue)) {
-    projectNames.push(currentValue);
+  const orderedProjects = [...projects];
+  if (currentValue && !orderedProjects.some((project) => project.project_name === currentValue)) {
+    orderedProjects.unshift({
+      project_name: currentValue,
+      total_events: 0,
+    });
   }
-  projectNames.sort();
-  const signature = projectNames.join("\u0000");
-  if (signature === state.projectSignature) {
+
+  const signature = orderedProjects
+    .map((project) => `${project.project_name}:${project.total_events}`)
+    .join("\u0000");
+  if (signature === state.projectOptionsSignature) {
     return;
   }
-  state.projectSignature = signature;
+  state.projectOptionsSignature = signature;
 
   select.innerHTML = '<option value="">All Projects</option>';
-  for (const projectName of projectNames) {
+  for (const project of orderedProjects) {
     const option = document.createElement("option");
-    option.value = projectName;
-    option.textContent = projectName;
-    option.selected = projectName === currentValue;
+    option.value = project.project_name;
+    option.textContent = project.project_name;
+    option.selected = project.project_name === currentValue;
     select.append(option);
+  }
+}
+
+function projectQuickPicks(projects) {
+  return projects
+    .filter((project) => !DEMOTED_PROJECTS.has(project.project_name))
+    .slice(0, 5);
+}
+
+function renderProjectQuickPicks(projects) {
+  const container = document.getElementById("project-quick-picks");
+  if (!container) {
+    return;
+  }
+
+  const quickPicks = projectQuickPicks(projects);
+  if (quickPicks.length === 0) {
+    container.innerHTML = "";
+    return;
+  }
+
+  container.innerHTML = "";
+
+  if (state.project) {
+    const allButton = document.createElement("button");
+    allButton.className = "project-quick-pick";
+    allButton.dataset.project = "";
+    allButton.type = "button";
+    allButton.textContent = "All";
+    container.append(allButton);
+  } else {
+    const label = document.createElement("span");
+    label.className = "quick-picks-label";
+    label.textContent = "Jump to";
+    container.append(label);
+  }
+
+  for (const project of quickPicks) {
+    const button = document.createElement("button");
+    button.className = "project-quick-pick";
+    if (project.project_name === state.project) {
+      button.classList.add("is-active");
+    }
+    button.dataset.project = project.project_name;
+    button.type = "button";
+
+    const name = document.createElement("span");
+    name.textContent = project.project_name;
+    button.append(name);
+
+    const count = document.createElement("strong");
+    count.textContent = formatCompactNumber(project.total_events);
+    button.append(count);
+
+    container.append(button);
+  }
+
+  for (const button of container.querySelectorAll(".project-quick-pick")) {
+    button.addEventListener("click", async () => {
+      state.project = button.dataset.project ?? "";
+      const select = document.getElementById("project-filter");
+      if (select instanceof HTMLSelectElement) {
+        select.value = state.project;
+      }
+      await loadMetrics();
+    });
   }
 }
 
@@ -467,7 +544,8 @@ async function loadMetrics(options = {}) {
     }
     state.latestRefresh = payload.last_refreshed_at;
     state.diagnostics = payload.refresh;
-    renderProjects(payload.rows);
+    renderProjectOptions(payload.projects);
+    renderProjectQuickPicks(payload.projects);
     renderSummary(payload.rows);
     renderTable(payload.rows);
     renderChart(payload.rows);

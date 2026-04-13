@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse
 
-from ai_monitor.db.queries import fetch_latest_refresh_run, fetch_metrics_rows
+from ai_monitor.db.queries import (
+    fetch_latest_refresh_run,
+    fetch_metrics_rows,
+    fetch_ranked_projects,
+)
 
 router = APIRouter()
 
@@ -21,9 +25,15 @@ def get_metrics(
         project=project,
         provider=provider,
     )
+    projects = fetch_ranked_projects(
+        database_path=config.database_path,
+        period=period,
+        provider=provider,
+    )
     return {
         "period": period,
         "rows": [row.__dict__ for row in rows],
+        "projects": [project_row.__dict__ for project_row in projects],
         "last_refreshed_at": None if last_refresh is None else last_refresh.refreshed_at,
         "refresh": None if last_refresh is None else last_refresh.__dict__,
     }

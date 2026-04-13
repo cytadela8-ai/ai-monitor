@@ -8,6 +8,7 @@ def test_metrics_endpoint_returns_selected_period_data(client: TestClient) -> No
     payload = response.json()
     assert payload["period"] == "week"
     assert "rows" in payload
+    assert "projects" in payload
 
 
 def test_refresh_endpoint_returns_refresh_report(client: TestClient) -> None:
@@ -34,6 +35,19 @@ def test_metrics_rows_are_sorted_newest_first(client: TestClient) -> None:
     assert response.status_code == 200
     rows = response.json()["rows"]
     assert rows == sorted(rows, key=lambda row: row["period_start"], reverse=True)
+
+
+def test_metrics_endpoint_returns_ranked_project_options(client: TestClient) -> None:
+    response = client.get("/api/metrics", params={"period": "day"})
+
+    assert response.status_code == 200
+    projects = response.json()["projects"]
+    assert projects[0]["project_name"] == "zk-chains-registry"
+    assert [project["project_name"] for project in projects] == [
+        "zk-chains-registry",
+        "zksync-prividium",
+    ]
+    assert all("total_events" in project for project in projects)
 
 
 def test_metrics_endpoint_returns_empty_payload_before_first_refresh(
