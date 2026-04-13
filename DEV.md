@@ -42,7 +42,8 @@ tests/
 1. Provider reads local source files.
 2. Ingestion service normalizes records.
 3. SQLite stores conversations, prompt events, and aggregate metrics.
-4. FastAPI reads aggregate metrics for the dashboard.
+4. FastAPI reads aggregate metrics for ledger rows and reads normalized base tables for
+   filter-scoped summary totals and the daily heatmap.
 5. The browser triggers the first refresh only when the cache is empty, so request handlers stay
    read-only and initial page rendering is not blocked by ingestion.
 
@@ -55,14 +56,17 @@ tests/
 
 ## Dashboard Notes
 
-- The main surface is the project usage ledger. Totals, chart, and diagnostics are secondary
+- The main surface is the project usage ledger. Totals, heatmap, and diagnostics are secondary
   support views rather than separate dashboard cards.
-- `Activity Wave` is rendered with a pinned local `Chart.js 4.5.1` bundle in
-  `ai_monitor/server/static/vendor/chart.umd.js` so the dashboard keeps a proper charting library
-  without introducing a Node build step or external runtime dependency.
 - `GET /api/metrics` also returns ranked project options for the current period/provider context so
   the client can keep the project picker stable and expose one-click project quick picks without
   recomputing rankings in the browser.
+- `GET /api/metrics` also returns a filter-scoped `summary` object and a `heatmap_days` series.
+  The summary stays fixed across day/week/month switches because it is computed from normalized
+  conversations and prompt events rather than by summing grouped ledger rows.
+- The daily heatmap is a 26-week, newest-first grid rendered entirely in the browser from API data.
+  Each cell shows exact day statistics on hover or focus.
+- The server enables gzip compression for larger text responses.
 - Mobile adapts the ledger into stacked row cards using the same table data, avoiding horizontal
   scrolling while keeping the same metrics visible, including under enlarged text.
 - The client keeps refresh state in the browser, exposes it through a live status region, and

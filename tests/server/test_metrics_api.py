@@ -9,6 +9,8 @@ def test_metrics_endpoint_returns_selected_period_data(client: TestClient) -> No
     assert payload["period"] == "week"
     assert "rows" in payload
     assert "projects" in payload
+    assert "summary" in payload
+    assert "heatmap_days" in payload
 
 
 def test_refresh_endpoint_returns_refresh_report(client: TestClient) -> None:
@@ -59,3 +61,40 @@ def test_metrics_endpoint_returns_empty_payload_before_first_refresh(
     payload = response.json()
     assert payload["refresh"] is None
     assert payload["rows"] == []
+    assert payload["summary"] == {
+        "conversation_count": 0,
+        "text_prompt_count": 0,
+        "slash_command_count": 0,
+    }
+    assert payload["heatmap_days"] == []
+
+
+def test_metrics_summary_stays_fixed_when_only_grouping_changes(
+    client: TestClient,
+) -> None:
+    day_payload = client.get("/api/metrics", params={"period": "day"}).json()
+    week_payload = client.get("/api/metrics", params={"period": "week"}).json()
+    month_payload = client.get("/api/metrics", params={"period": "month"}).json()
+
+    expected_summary = {
+        "conversation_count": 3,
+        "text_prompt_count": 3,
+        "slash_command_count": 2,
+    }
+
+    assert day_payload["summary"] == expected_summary
+    assert week_payload["summary"] == expected_summary
+    assert month_payload["summary"] == expected_summary
+
+
+def test_metrics_endpoint_returns_daily_heatmap_series(client: TestClient) -> None:
+    payload = client.get("/api/metrics", params={"period": "day"}).json()
+
+    assert payload["heatmap_days"]
+    assert {
+        "day": "2026-03-27",
+        "conversation_count": 3,
+        "text_prompt_count": 3,
+        "slash_command_count": 2,
+        "total_events": 5,
+    } in payload["heatmap_days"]

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -17,6 +18,7 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     server_root = Path(__file__).resolve().parent
     ensure_database(app_config.database_path)
     app = FastAPI(title="AI Monitor")
+    app.add_middleware(GZipMiddleware, minimum_size=500)
     app.state.config = app_config
     app.state.static_path = server_root / "static"
     app.state.templates = Jinja2Templates(directory=str(server_root / "templates"))

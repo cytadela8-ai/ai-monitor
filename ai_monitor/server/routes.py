@@ -2,9 +2,11 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse
 
 from ai_monitor.db.queries import (
+    fetch_daily_heatmap,
     fetch_latest_refresh_run,
     fetch_metrics_rows,
     fetch_ranked_projects,
+    fetch_summary_metrics,
 )
 
 router = APIRouter()
@@ -25,6 +27,17 @@ def get_metrics(
         project=project,
         provider=provider,
     )
+    summary = fetch_summary_metrics(
+        database_path=config.database_path,
+        project=project,
+        provider=provider,
+    )
+    heatmap_days = fetch_daily_heatmap(
+        database_path=config.database_path,
+        project=project,
+        provider=provider,
+        days=182,
+    )
     projects = fetch_ranked_projects(
         database_path=config.database_path,
         period=period,
@@ -33,6 +46,8 @@ def get_metrics(
     return {
         "period": period,
         "rows": [row.__dict__ for row in rows],
+        "summary": summary.__dict__,
+        "heatmap_days": [day.__dict__ for day in heatmap_days],
         "projects": [project_row.__dict__ for project_row in projects],
         "last_refreshed_at": None if last_refresh is None else last_refresh.refreshed_at,
         "refresh": None if last_refresh is None else last_refresh.__dict__,

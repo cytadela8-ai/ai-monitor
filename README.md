@@ -41,10 +41,12 @@ Use the dashboard refresh button or the `POST /api/refresh` endpoint to rebuild 
 data from the local logs. Aggregates are rebuilt into a local SQLite cache and then served to the
 dashboard from there. On narrow screens, the project ledger collapses into stacked row cards
 instead of relying on horizontal scrolling, and the status rail announces scan progress as the
-local cache loads or refreshes. The `Activity Wave` panel uses a local vendored Chart.js bundle,
-so the graph renders with explicit axes and hover tooltips without depending on a CDN. The project
-picker is ranked by recent activity, and the toolbar exposes one-click project quick picks for the
-most active current projects.
+local cache loads or refreshes. The totals band now reflects only the active project and tool
+filters, so it stays fixed when you switch the ledger between day, week, and month groupings. The
+right-side panel is a vertical daily activity heatmap with newest weeks at the top and exact
+per-day counts on hover or keyboard focus. The project picker is ranked by recent activity, the
+toolbar exposes one-click project quick picks for the most active current projects, and text
+responses are gzip-compressed by the FastAPI app to reduce initial transfer size.
 
 ## Default Sources
 

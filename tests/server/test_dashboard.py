@@ -8,7 +8,7 @@ def test_dashboard_renders_summary_labels(client: TestClient) -> None:
     body = response.text
     assert "Conversations" in body
     assert "Text Prompts" in body
-    assert "Slash Commands" in body
+    assert "Slash Cmds" in body
     assert "Day" in body
     assert "Week" in body
     assert "Month" in body
@@ -40,16 +40,18 @@ def test_dashboard_exposes_accessible_controls_and_table_context(client: TestCli
     assert 'aria-pressed="true"' in body
     assert 'aria-pressed="false"' in body
     assert "<caption>" in body
-    assert 'id="chart-summary"' in body
-    assert 'class="totals-strip"' in body
-    assert 'class="summary-chip"' in body
+    assert 'id="heatmap-summary"' in body
+    assert 'class="toolbar panel"' in body
+    assert 'class="summary-chip summary-chip--conversations"' in body
     assert 'aria-live="polite"' in body
     assert 'role="status"' in body
     assert 'class="metrics-table"' in body
     assert 'data-last-refresh="' in body
-    assert 'id="chart-canvas"' in body
-    assert 'id="chart-hover-value"' in body
-    assert 'static/vendor/chart.umd.js' in body
+    assert 'id="heatmap-grid"' in body
+    assert 'id="heatmap-hover-detail"' in body
+    assert "Ledger Grouping" in body
+    assert "This changes the ledger rows below, not the totals." in body
+    assert 'static/vendor/chart.' not in body
     assert 'class="diagnostics-shell"' in body
     assert 'id="project-quick-picks"' in body
 
