@@ -71,5 +71,9 @@ class ClaudeProvider:
 
     @staticmethod
     def _parse_timestamp(timestamp_ms: object) -> datetime:
+        if not isinstance(timestamp_ms, int | str):
+            msg = f"Unsupported Claude timestamp value: {timestamp_ms!r}"
+            raise ValueError(msg)
+
         timestamp = int(timestamp_ms) / 1000
         return datetime.fromtimestamp(timestamp, tz=UTC)
