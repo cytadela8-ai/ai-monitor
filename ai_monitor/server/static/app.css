@@ -289,8 +289,9 @@ h2 {
 }
 
 .filter-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 220px));
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 14px;
   justify-content: end;
 }
@@ -439,12 +440,19 @@ h2 {
 }
 
 .filter {
-  display: grid;
-  gap: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.filter span {
+  white-space: nowrap;
 }
 
 .filter select {
-  min-width: 180px;
+  width: 180px;
+  min-width: 0;
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--surface-border));
   border-radius: var(--radius-md);
@@ -987,6 +995,7 @@ td {
 
   .filter-row {
     width: 100%;
+    display: grid;
     grid-template-columns: 1fr;
   }
 
