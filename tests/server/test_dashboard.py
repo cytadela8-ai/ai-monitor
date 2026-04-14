@@ -54,6 +54,7 @@ def test_dashboard_exposes_accessible_controls_and_table_context(client: TestCli
     assert 'static/vendor/chart.' not in body
     assert 'class="diagnostics-shell"' in body
     assert 'id="project-quick-picks"' in body
+    assert 'id="machine-filter"' in body
 
 
 def test_fresh_dashboard_marks_cache_as_missing(fresh_client: TestClient) -> None:

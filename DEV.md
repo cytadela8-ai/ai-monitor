@@ -5,7 +5,8 @@
 The project is split into two main parts:
 
 - `ai_monitor.ingestion`
-  Reads raw local logs, normalizes provider-specific records, and rebuilds the SQLite cache.
+  Reads raw local logs, normalizes provider-specific records, and rebuilds one machine slice in
+  the SQLite cache.
 - `ai_monitor.server`
   Serves the dashboard and API endpoints by reading normalized data only.
 
@@ -20,15 +21,21 @@ ai_monitor/
     base.py
     models.py
     path_utils.py
+    snapshots.py
     service.py
-    providers/
+  providers/
       claude.py
       codex.py
   db/
     schema.py
     queries.py
+  auth.py
+  machines.py
+  cli.py
   server/
     app.py
+    admin_routes.py
+    ingest_routes.py
     routes.py
     templates/
     static/
@@ -40,12 +47,23 @@ tests/
 ## Data Flow
 
 1. Provider reads local source files.
-2. Ingestion service normalizes records.
-3. SQLite stores conversations, prompt events, and aggregate metrics.
+2. Ingestion service builds a normalized snapshot.
+3. SQLite stores conversations, prompt events, and aggregate metrics in a machine-scoped slice.
 4. FastAPI reads aggregate metrics for ledger rows and reads normalized base tables for
-   filter-scoped summary totals and the daily heatmap.
-5. The browser triggers the first refresh only when the cache is empty, so request handlers stay
+   machine-scoped summary totals and the daily heatmap.
+5. The browser triggers the first refresh only when the local machine slice is empty, so request
+   handlers stay
    read-only and initial page rendering is not blocked by ingestion.
+
+## Multi-Machine Model
+
+- `machines` stores one row per machine identity, with the remote machine identity defined by the
+  machine API key.
+- `machine_refresh_runs` records per-machine refresh and upload history.
+- `conversations`, `prompt_events`, and `aggregate_metrics` all carry `machine_id`.
+- Local refresh replaces only the local machine slice.
+- Remote sync replaces only the authenticated remote machine slice.
+- The dashboard can show all machines together or filter down to one machine label.
 
 ## Provider Boundaries
 
@@ -53,17 +71,32 @@ tests/
 - `CodexProvider` joins Codex history with session metadata to recover project paths.
 - `IngestionService` does not know provider-specific file formats.
 - `server` code does not read raw history files directly.
+- `ai-monitor-sync` reuses the same provider and normalization code as local refresh instead of
+  introducing a second parsing path.
+
+## Auth And Entry Points
+
+- `ai-monitor-server` starts the FastAPI app and uses the bootstrap admin key from config to guard
+  machine-management APIs.
+- `ai-monitor-sync` is a CLI-only entry point. It never runs an HTTP listener.
+- `ai_monitor.auth` hashes generated machine keys.
+- `ai_monitor.machines` owns local machine creation, machine-key minting, revoke operations, and
+  machine-key authentication.
 
 ## Dashboard Notes
 
 - The main surface is the project usage ledger. Totals, heatmap, and diagnostics are secondary
   support views rather than separate dashboard cards.
+- The toolbar now includes a machine filter. In the all-machines view, the ledger includes a
+  machine column so combined rows stay intelligible.
 - `GET /api/metrics` also returns ranked project options for the current period/provider context so
   the client can keep the project picker stable and expose one-click project quick picks without
   recomputing rankings in the browser.
 - `GET /api/metrics` also returns a filter-scoped `summary` object and a `heatmap_days` series.
   The summary stays fixed across day/week/month switches because it is computed from normalized
   conversations and prompt events rather than by summing grouped ledger rows.
+- `GET /api/metrics` also returns machine options so the browser can keep the machine filter in
+  sync with the server-side machine registry.
 - The daily heatmap is a 26-week, newest-first grid rendered entirely in the browser from API data.
   Each cell shows exact day statistics on hover or focus.
 - The server enables gzip compression for larger text responses.

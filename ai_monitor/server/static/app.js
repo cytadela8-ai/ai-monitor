@@ -3,6 +3,8 @@ const state = {
   heatmapMarkup: "",
   latestRefresh: null,
   loading: false,
+  machine: "",
+  machineOptionsSignature: "",
   period: "day",
   project: "",
   projectOptionsSignature: "",
@@ -11,7 +13,7 @@ const state = {
   tableMarkup: "",
 };
 
-const TABLE_COLUMNS = [
+const BASE_TABLE_COLUMNS = [
   ["Period", "period_start"],
   ["Project", "project_name"],
   ["Tool", "provider"],
@@ -257,15 +259,26 @@ function renderSummary(summary) {
 
 function renderTable(rows) {
   const tbody = document.getElementById("metrics-table-body");
+  const head = document.getElementById("metrics-table-head");
   if (!tbody) {
     return;
+  }
+
+  const columns = state.machine
+    ? BASE_TABLE_COLUMNS
+    : [
+      ["Machine", "machine_label"],
+      ...BASE_TABLE_COLUMNS,
+    ];
+  if (head) {
+    head.innerHTML = columns.map(([label]) => `<th>${escapeHtml(label)}</th>`).join("");
   }
 
   if (rows.length === 0) {
     const message = state.latestRefresh
       ? "No activity for this mix of filters."
       : "No saved activity yet. Your first local read is still pending.";
-    const markup = `<tr><td class="empty-state" colspan="6">${escapeHtml(message)}</td></tr>`;
+    const markup = `<tr><td class="empty-state" colspan="${columns.length}">${escapeHtml(message)}</td></tr>`;
     if (markup !== state.tableMarkup) {
       tbody.innerHTML = markup;
       state.tableMarkup = markup;
@@ -275,7 +288,7 @@ function renderTable(rows) {
 
   const markup = rows
     .map((row) => {
-      const cells = TABLE_COLUMNS.map(([label, field]) => {
+      const cells = columns.map(([label, field]) => {
         let rawValue = row[field];
         if (field === "provider") {
           rawValue = formatProvider(rawValue);
@@ -466,6 +479,30 @@ function renderHeatmap(days) {
   }
 }
 
+function renderMachineOptions(machines) {
+  const select = document.getElementById("machine-filter");
+  if (!select) {
+    return;
+  }
+
+  const signature = machines
+    .map((machine) => `${machine.label}:${machine.last_refresh_at || ""}`)
+    .join("\u0000");
+  if (signature === state.machineOptionsSignature) {
+    return;
+  }
+  state.machineOptionsSignature = signature;
+
+  select.innerHTML = '<option value="">All Machines</option>';
+  for (const machine of machines) {
+    const option = document.createElement("option");
+    option.value = machine.label;
+    option.textContent = machine.label;
+    option.selected = machine.label === state.machine;
+    select.append(option);
+  }
+}
+
 function renderProjectOptions(projects) {
   const select = document.getElementById("project-filter");
   if (!select) {
@@ -594,6 +631,9 @@ async function loadMetrics(options = {}) {
 
   try {
     const params = new URLSearchParams({ period: state.period });
+    if (state.machine) {
+      params.set("machine", state.machine);
+    }
     if (state.project) {
       params.set("project", state.project);
     }
@@ -612,6 +652,7 @@ async function loadMetrics(options = {}) {
     }
     state.latestRefresh = payload.last_refreshed_at;
     state.diagnostics = payload.refresh;
+    renderMachineOptions(payload.machines);
     renderProjectOptions(payload.projects);
     renderProjectQuickPicks(payload.projects);
     renderSummary(payload.summary);
@@ -687,6 +728,11 @@ function bindControls() {
 
   document.getElementById("project-filter")?.addEventListener("change", async (event) => {
     state.project = event.target.value;
+    await loadMetrics();
+  });
+
+  document.getElementById("machine-filter")?.addEventListener("change", async (event) => {
+    state.machine = event.target.value;
     await loadMetrics();
   });
 

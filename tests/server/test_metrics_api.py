@@ -98,3 +98,66 @@ def test_metrics_endpoint_returns_daily_heatmap_series(client: TestClient) -> No
         "slash_command_count": 2,
         "total_events": 5,
     } in payload["heatmap_days"]
+
+
+def test_metrics_endpoint_returns_machine_options(client: TestClient) -> None:
+    payload = client.get("/api/metrics", params={"period": "day"}).json()
+
+    assert payload["machines"] == [
+        {
+            "label": "main-server",
+            "is_local": True,
+            "last_refresh_at": payload["last_refreshed_at"],
+            "last_refresh_source": "local_refresh",
+        }
+    ]
+
+
+def test_metrics_endpoint_filters_to_requested_machine(
+    client: TestClient,
+    admin_headers: dict[str, str],
+) -> None:
+    create_response = client.post(
+        "/api/admin/machines",
+        headers=admin_headers,
+        json={"label": "work-laptop"},
+    )
+    api_key = create_response.json()["api_key"]
+    upload_response = client.post(
+        "/api/ingest/snapshot",
+        headers={"Authorization": f"Bearer {api_key}"},
+        json={
+            "generated_at": "2026-04-02T10:00:00+00:00",
+            "providers": ["claude"],
+            "conversations": [
+                {
+                    "provider": "claude",
+                    "external_id": "remote-session-1",
+                    "started_at": "2026-04-02T09:00:00+00:00",
+                    "project_path": "/work/remote-alpha",
+                    "project_name": "remote-alpha",
+                }
+            ],
+            "prompt_events": [
+                {
+                    "provider": "claude",
+                    "external_conversation_id": "remote-session-1",
+                    "occurred_at": "2026-04-02T09:05:00+00:00",
+                    "project_path": "/work/remote-alpha",
+                    "project_name": "remote-alpha",
+                    "event_type": "text_prompt",
+                    "raw_text": "remote prompt",
+                }
+            ],
+        },
+    )
+
+    assert upload_response.status_code == 200
+
+    payload = client.get(
+        "/api/metrics",
+        params={"period": "day", "machine": "work-laptop"},
+    ).json()
+
+    assert payload["machine"] == "work-laptop"
+    assert {row["machine_label"] for row in payload["rows"]} == {"work-laptop"}

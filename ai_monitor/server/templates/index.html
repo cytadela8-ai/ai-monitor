@@ -60,6 +60,12 @@
         </div>
         <div class="filter-row">
           <label class="filter">
+            <span>Machine</span>
+            <select id="machine-filter">
+              <option value="">All Machines</option>
+            </select>
+          </label>
+          <label class="filter">
             <span>Project</span>
             <select id="project-filter">
               <option value="">All Projects</option>
@@ -113,7 +119,8 @@
                 Rolled-up AI activity by period, project, and tool for the filters above.
               </caption>
               <thead>
-                <tr>
+                <tr id="metrics-table-head">
+                  <th>Machine</th>
                   <th>Period</th>
                   <th>Project</th>
                   <th>Tool</th>

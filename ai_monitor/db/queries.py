@@ -8,6 +8,7 @@ from ai_monitor.db.schema import ensure_database
 
 @dataclass(frozen=True)
 class AggregateRow:
+    machine_label: str
     period_type: str
     period_start: str
     project_name: str
@@ -19,7 +20,9 @@ class AggregateRow:
 
 @dataclass(frozen=True)
 class RefreshRunRow:
+    machine_label: str
     refreshed_at: str
+    refresh_source: str
     provider_count: int
     conversation_count: int
     prompt_event_count: int
@@ -41,6 +44,14 @@ class SummaryMetricsRow:
 
 
 @dataclass(frozen=True)
+class MachineOptionRow:
+    label: str
+    is_local: bool
+    last_refresh_at: str | None
+    last_refresh_source: str | None
+
+
+@dataclass(frozen=True)
 class DailyHeatmapRow:
     day: str
     conversation_count: int
@@ -52,9 +63,14 @@ class DailyHeatmapRow:
 def _build_where_clauses(
     project: str | None = None,
     provider: str | None = None,
+    machine: str | None = None,
 ) -> tuple[list[str], list[str]]:
     clauses: list[str] = []
     params: list[str] = []
+
+    if machine is not None:
+        clauses.append("machines.label = ?")
+        params.append(machine)
 
     if project is not None:
         clauses.append("project_name = ?")
@@ -71,13 +87,15 @@ def _resolve_latest_prompt_day(
     connection: sqlite3.Connection,
     project: str | None = None,
     provider: str | None = None,
+    machine: str | None = None,
 ) -> date | None:
-    clauses, params = _build_where_clauses(project=project, provider=provider)
+    clauses, params = _build_where_clauses(project=project, provider=provider, machine=machine)
     where_sql = "" if not clauses else f"WHERE {' AND '.join(clauses)}"
     row = connection.execute(
         f"""
         SELECT MAX(date(occurred_at))
         FROM prompt_events
+        JOIN machines ON machines.id = prompt_events.machine_id
         {where_sql}
         """,
         params,
@@ -95,6 +113,7 @@ def fetch_aggregate_rows(database_path: Path) -> list[AggregateRow]:
         rows = connection.execute(
             """
             SELECT
+                machines.label,
                 period_type,
                 period_start,
                 project_name,
@@ -103,7 +122,8 @@ def fetch_aggregate_rows(database_path: Path) -> list[AggregateRow]:
                 text_prompt_count,
                 slash_command_count
             FROM aggregate_metrics
-            ORDER BY period_type, period_start, project_name, provider
+            JOIN machines ON machines.id = aggregate_metrics.machine_id
+            ORDER BY machines.label, period_type, period_start, project_name, provider
             """
         ).fetchall()
     finally:
@@ -111,13 +131,14 @@ def fetch_aggregate_rows(database_path: Path) -> list[AggregateRow]:
 
     return [
         AggregateRow(
-            period_type=row[0],
-            period_start=row[1],
-            project_name=row[2],
-            provider=row[3],
-            conversation_count=row[4],
-            text_prompt_count=row[5],
-            slash_command_count=row[6],
+            machine_label=row[0],
+            period_type=row[1],
+            period_start=row[2],
+            project_name=row[3],
+            provider=row[4],
+            conversation_count=row[5],
+            text_prompt_count=row[6],
+            slash_command_count=row[7],
         )
         for row in rows
     ]
@@ -128,10 +149,15 @@ def fetch_metrics_rows(
     period: str,
     project: str | None = None,
     provider: str | None = None,
+    machine: str | None = None,
 ) -> list[AggregateRow]:
     ensure_database(database_path)
     where_clauses = ["period_type = ?"]
     params: list[str] = [period]
+
+    if machine is not None:
+        where_clauses.append("machines.label = ?")
+        params.append(machine)
 
     if project is not None:
         where_clauses.append("project_name = ?")
@@ -147,6 +173,7 @@ def fetch_metrics_rows(
         rows = connection.execute(
             f"""
             SELECT
+                machines.label,
                 period_type,
                 period_start,
                 project_name,
@@ -155,8 +182,9 @@ def fetch_metrics_rows(
                 text_prompt_count,
                 slash_command_count
             FROM aggregate_metrics
+            JOIN machines ON machines.id = aggregate_metrics.machine_id
             WHERE {where_sql}
-            ORDER BY period_start DESC, project_name, provider
+            ORDER BY period_start DESC, machines.label, project_name, provider
             """,
             params,
         ).fetchall()
@@ -165,13 +193,14 @@ def fetch_metrics_rows(
 
     return [
         AggregateRow(
-            period_type=row[0],
-            period_start=row[1],
-            project_name=row[2],
-            provider=row[3],
-            conversation_count=row[4],
-            text_prompt_count=row[5],
-            slash_command_count=row[6],
+            machine_label=row[0],
+            period_type=row[1],
+            period_start=row[2],
+            project_name=row[3],
+            provider=row[4],
+            conversation_count=row[5],
+            text_prompt_count=row[6],
+            slash_command_count=row[7],
         )
         for row in rows
     ]
@@ -181,16 +210,19 @@ def fetch_summary_metrics(
     database_path: Path,
     project: str | None = None,
     provider: str | None = None,
+    machine: str | None = None,
 ) -> SummaryMetricsRow:
     """Return filter-scoped summary totals independent of ledger grouping."""
     ensure_database(database_path)
     conversation_clauses, conversation_params = _build_where_clauses(
         project=project,
         provider=provider,
+        machine=machine,
     )
     prompt_clauses, prompt_params = _build_where_clauses(
         project=project,
         provider=provider,
+        machine=machine,
     )
     conversation_where = "" if not conversation_clauses else (
         f"WHERE {' AND '.join(conversation_clauses)}"
@@ -203,6 +235,7 @@ def fetch_summary_metrics(
             f"""
             SELECT COUNT(*)
             FROM conversations
+            JOIN machines ON machines.id = conversations.machine_id
             {conversation_where}
             """,
             conversation_params,
@@ -213,6 +246,7 @@ def fetch_summary_metrics(
                 COALESCE(SUM(CASE WHEN event_type = 'text_prompt' THEN 1 ELSE 0 END), 0),
                 COALESCE(SUM(CASE WHEN event_type = 'slash_command' THEN 1 ELSE 0 END), 0)
             FROM prompt_events
+            JOIN machines ON machines.id = prompt_events.machine_id
             {prompt_where}
             """,
             prompt_params,
@@ -231,6 +265,7 @@ def fetch_daily_heatmap(
     database_path: Path,
     project: str | None = None,
     provider: str | None = None,
+    machine: str | None = None,
     days: int = 365,
 ) -> list[DailyHeatmapRow]:
     """Return newest-first daily activity rows with zero-filled inactive days."""
@@ -241,11 +276,12 @@ def fetch_daily_heatmap(
             connection,
             project=project,
             provider=provider,
+            machine=machine,
         )
         if latest_day is None:
             return []
 
-        clauses, params = _build_where_clauses(project=project, provider=provider)
+        clauses, params = _build_where_clauses(project=project, provider=provider, machine=machine)
         clauses.append("date(occurred_at) BETWEEN ? AND ?")
         start_day = latest_day - timedelta(days=max(days - 1, 0))
         params.extend([start_day.isoformat(), latest_day.isoformat()])
@@ -257,6 +293,7 @@ def fetch_daily_heatmap(
                 COALESCE(SUM(CASE WHEN event_type = 'text_prompt' THEN 1 ELSE 0 END), 0),
                 COALESCE(SUM(CASE WHEN event_type = 'slash_command' THEN 1 ELSE 0 END), 0)
             FROM prompt_events
+            JOIN machines ON machines.id = prompt_events.machine_id
             WHERE {' AND '.join(clauses)}
             GROUP BY day
             ORDER BY day DESC
@@ -298,11 +335,16 @@ def fetch_ranked_projects(
     database_path: Path,
     period: str,
     provider: str | None = None,
+    machine: str | None = None,
 ) -> list[ProjectOptionRow]:
     """Return ranked project options for the current period and provider filter."""
     ensure_database(database_path)
     where_clauses = ["period_type = ?"]
     params: list[str] = [period]
+
+    if machine is not None:
+        where_clauses.append("machines.label = ?")
+        params.append(machine)
 
     if provider is not None:
         where_clauses.append("provider = ?")
@@ -319,6 +361,7 @@ def fetch_ranked_projects(
                 SUM(text_prompt_count + slash_command_count) AS total_events,
                 SUM(conversation_count) AS conversation_count
             FROM aggregate_metrics
+            JOIN machines ON machines.id = aggregate_metrics.machine_id
             WHERE {where_sql}
             GROUP BY project_name
             ORDER BY
@@ -349,17 +392,60 @@ def fetch_ranked_projects(
     ]
 
 
-def fetch_latest_refresh_run(database_path: Path) -> RefreshRunRow | None:
+def fetch_machine_options(database_path: Path) -> list[MachineOptionRow]:
     ensure_database(database_path)
     connection = sqlite3.connect(database_path)
     try:
+        rows = connection.execute(
+            """
+            SELECT label, is_local, last_refresh_at, last_refresh_source
+            FROM machines
+            WHERE is_active = 1 OR is_local = 1
+            ORDER BY is_local DESC, label
+            """
+        ).fetchall()
+    finally:
+        connection.close()
+
+    return [
+        MachineOptionRow(
+            label=row[0],
+            is_local=bool(row[1]),
+            last_refresh_at=row[2],
+            last_refresh_source=row[3],
+        )
+        for row in rows
+    ]
+
+
+def fetch_latest_refresh_run(
+    database_path: Path,
+    machine: str | None = None,
+) -> RefreshRunRow | None:
+    ensure_database(database_path)
+    where_sql = ""
+    params: list[str] = []
+    if machine is not None:
+        where_sql = "WHERE machines.label = ?"
+        params.append(machine)
+    connection = sqlite3.connect(database_path)
+    try:
         row = connection.execute(
-            """
-            SELECT refreshed_at, provider_count, conversation_count, prompt_event_count
-            FROM refresh_runs
-            ORDER BY id DESC
+            f"""
+            SELECT
+                machines.label,
+                machine_refresh_runs.refreshed_at,
+                machine_refresh_runs.refresh_source,
+                machine_refresh_runs.provider_count,
+                machine_refresh_runs.conversation_count,
+                machine_refresh_runs.prompt_event_count
+            FROM machine_refresh_runs
+            JOIN machines ON machines.id = machine_refresh_runs.machine_id
+            {where_sql}
+            ORDER BY machine_refresh_runs.id DESC
             LIMIT 1
-            """
+            """,
+            params,
         ).fetchone()
     finally:
         connection.close()
@@ -368,8 +454,10 @@ def fetch_latest_refresh_run(database_path: Path) -> RefreshRunRow | None:
         return None
 
     return RefreshRunRow(
-        refreshed_at=row[0],
-        provider_count=row[1],
-        conversation_count=row[2],
-        prompt_event_count=row[3],
+        machine_label=row[0],
+        refreshed_at=row[1],
+        refresh_source=row[2],
+        provider_count=row[3],
+        conversation_count=row[4],
+        prompt_event_count=row[5],
     )

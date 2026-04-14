@@ -1,7 +1,12 @@
 import sqlite3
 from pathlib import Path
 
-from ai_monitor.db.queries import fetch_daily_heatmap, fetch_summary_metrics
+from ai_monitor.db.queries import (
+    fetch_daily_heatmap,
+    fetch_machine_options,
+    fetch_metrics_rows,
+    fetch_summary_metrics,
+)
 from ai_monitor.db.schema import ensure_database
 
 
@@ -12,17 +17,59 @@ def seed_usage_database(database_path: Path) -> None:
         with connection:
             connection.executemany(
                 """
+                INSERT INTO machines (
+                    id,
+                    label,
+                    api_key_hash,
+                    is_local,
+                    is_active,
+                    created_at,
+                    last_seen_at,
+                    last_refresh_at,
+                    last_refresh_source
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        1,
+                        "main-server",
+                        None,
+                        1,
+                        1,
+                        "2026-03-27T09:00:00+00:00",
+                        "2026-03-30T09:00:00+00:00",
+                        "2026-03-30T09:00:00+00:00",
+                        "local_refresh",
+                    ),
+                    (
+                        2,
+                        "work-laptop",
+                        "hash-1",
+                        0,
+                        1,
+                        "2026-03-28T09:00:00+00:00",
+                        "2026-03-29T09:00:00+00:00",
+                        "2026-03-29T09:00:00+00:00",
+                        "remote_push",
+                    ),
+                ],
+            )
+            connection.executemany(
+                """
                 INSERT INTO conversations (
+                    machine_id,
                     provider,
                     external_id,
                     started_at,
                     project_path,
                     project_name
                 )
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
+                        1,
                         "codex",
                         "c1",
                         "2026-03-27T10:00:00+00:00",
@@ -30,6 +77,7 @@ def seed_usage_database(database_path: Path) -> None:
                         "alpha",
                     ),
                     (
+                        1,
                         "claude",
                         "c2",
                         "2026-03-28T12:00:00+00:00",
@@ -37,6 +85,7 @@ def seed_usage_database(database_path: Path) -> None:
                         "alpha",
                     ),
                     (
+                        2,
                         "claude",
                         "c3",
                         "2026-03-30T09:00:00+00:00",
@@ -48,6 +97,7 @@ def seed_usage_database(database_path: Path) -> None:
             connection.executemany(
                 """
                 INSERT INTO prompt_events (
+                    machine_id,
                     provider,
                     external_conversation_id,
                     occurred_at,
@@ -56,10 +106,11 @@ def seed_usage_database(database_path: Path) -> None:
                     event_type,
                     raw_text
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
+                        1,
                         "codex",
                         "c1",
                         "2026-03-27T10:00:00+00:00",
@@ -69,6 +120,7 @@ def seed_usage_database(database_path: Path) -> None:
                         "first prompt",
                     ),
                     (
+                        1,
                         "codex",
                         "c1",
                         "2026-03-28T09:30:00+00:00",
@@ -78,6 +130,7 @@ def seed_usage_database(database_path: Path) -> None:
                         "second prompt",
                     ),
                     (
+                        1,
                         "codex",
                         "c1",
                         "2026-03-28T09:31:00+00:00",
@@ -87,6 +140,7 @@ def seed_usage_database(database_path: Path) -> None:
                         "/clear",
                     ),
                     (
+                        1,
                         "claude",
                         "c2",
                         "2026-03-28T12:00:00+00:00",
@@ -96,6 +150,7 @@ def seed_usage_database(database_path: Path) -> None:
                         "third prompt",
                     ),
                     (
+                        2,
                         "claude",
                         "c3",
                         "2026-03-30T09:00:00+00:00",
@@ -104,6 +159,27 @@ def seed_usage_database(database_path: Path) -> None:
                         "slash_command",
                         "/help",
                     ),
+                ],
+            )
+            connection.executemany(
+                """
+                INSERT INTO aggregate_metrics (
+                    machine_id,
+                    period_type,
+                    period_start,
+                    project_name,
+                    provider,
+                    conversation_count,
+                    text_prompt_count,
+                    slash_command_count
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (1, "day", "2026-03-27", "alpha", "codex", 1, 1, 0),
+                    (1, "day", "2026-03-28", "alpha", "claude", 1, 1, 0),
+                    (1, "day", "2026-03-28", "alpha", "codex", 1, 1, 1),
+                    (2, "day", "2026-03-30", "beta", "claude", 1, 0, 1),
                 ],
             )
     finally:
@@ -140,6 +216,17 @@ def test_fetch_summary_metrics_respects_project_and_provider_filters(
     assert summary.slash_command_count == 1
 
 
+def test_fetch_summary_metrics_respects_machine_filter(tmp_path: Path) -> None:
+    database_path = tmp_path / "usage.db"
+    seed_usage_database(database_path)
+
+    summary = fetch_summary_metrics(database_path, machine="work-laptop")
+
+    assert summary.conversation_count == 1
+    assert summary.text_prompt_count == 0
+    assert summary.slash_command_count == 1
+
+
 def test_fetch_daily_heatmap_returns_exact_counts_with_zero_filled_days(
     tmp_path: Path,
 ) -> None:
@@ -173,3 +260,38 @@ def test_fetch_daily_heatmap_filters_to_requested_project(tmp_path: Path) -> Non
         "2026-03-25",
     ]
     assert [row.total_events for row in rows] == [3, 1, 0, 0]
+
+
+def test_fetch_metrics_rows_combines_all_machines_by_default(tmp_path: Path) -> None:
+    database_path = tmp_path / "usage.db"
+    seed_usage_database(database_path)
+
+    rows = fetch_metrics_rows(database_path, period="day")
+
+    assert [row.machine_label for row in rows] == [
+        "work-laptop",
+        "main-server",
+        "main-server",
+        "main-server",
+    ]
+
+
+def test_fetch_metrics_rows_filters_to_selected_machine(tmp_path: Path) -> None:
+    database_path = tmp_path / "usage.db"
+    seed_usage_database(database_path)
+
+    rows = fetch_metrics_rows(database_path, period="day", machine="main-server")
+
+    assert {row.machine_label for row in rows} == {"main-server"}
+    assert {row.project_name for row in rows} == {"alpha"}
+
+
+def test_fetch_machine_options_returns_known_machine_status(tmp_path: Path) -> None:
+    database_path = tmp_path / "usage.db"
+    seed_usage_database(database_path)
+
+    rows = fetch_machine_options(database_path)
+
+    assert [row.label for row in rows] == ["main-server", "work-laptop"]
+    assert rows[0].is_local is True
+    assert rows[1].last_refresh_source == "remote_push"

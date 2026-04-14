@@ -17,6 +17,10 @@ dependencies = [
   "uvicorn==0.44.0",
 ]
 
+[project.scripts]
+ai-monitor-server = "ai_monitor.server.app:main"
+ai-monitor-sync = "ai_monitor.cli:sync_entrypoint"
+
 [dependency-groups]
 dev = [
   "httpx==0.28.1",
