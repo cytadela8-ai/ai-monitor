@@ -1,3 +1,4 @@
+import argparse
 import json
 import sys
 from collections.abc import Callable
@@ -16,6 +17,14 @@ class SyncUploadResult:
     conversation_count: int
     prompt_event_count: int
     provider_count: int
+
+
+def _build_sync_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="ai-monitor-sync",
+        description="Read local AI usage logs and push a full snapshot to the server.",
+    )
+    return parser
 
 
 def build_client_snapshot(config: ClientConfig) -> UsageSnapshot:
@@ -111,4 +120,5 @@ def run_sync(
 
 
 def sync_entrypoint() -> None:
+    _build_sync_parser().parse_args()
     raise SystemExit(run_sync())

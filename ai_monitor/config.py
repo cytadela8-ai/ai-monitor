@@ -13,7 +13,9 @@ def _load_working_directory_dotenv() -> None:
 
 def _env_path(name: str, default: Path) -> Path:
     value = os.getenv(name)
-    return default if value is None else Path(value).expanduser()
+    if value is None:
+        return default
+    return Path(os.path.expandvars(value)).expanduser()
 
 
 def _require_env(name: str) -> str:

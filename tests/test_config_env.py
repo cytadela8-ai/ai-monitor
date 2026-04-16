@@ -85,6 +85,33 @@ def test_client_config_loads_values_from_dotenv(
     assert config.api_key == "dotenv-machine-key"
 
 
+def test_client_config_expands_environment_variables_in_paths(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _clear_env(monkeypatch, CLIENT_ENV_KEYS)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            [
+                "AI_MONITOR_SERVER_URL=https://example.test/root/",
+                "AI_MONITOR_API_KEY=dotenv-machine-key",
+                "AI_MONITOR_CLAUDE_HISTORY_PATH=$HOME/.claude/history.jsonl",
+                "AI_MONITOR_CODEX_HISTORY_PATH=$HOME/.codex/history.jsonl",
+                "AI_MONITOR_CODEX_SESSIONS_ROOT=$HOME/.codex/sessions",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = ClientConfig.from_env()
+
+    assert config.claude_history_path == tmp_path / "home" / ".claude" / "history.jsonl"
+    assert config.codex_history_path == tmp_path / "home" / ".codex" / "history.jsonl"
+    assert config.codex_sessions_root == tmp_path / "home" / ".codex" / "sessions"
+
+
 def test_process_environment_overrides_dotenv(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

@@ -1,6 +1,9 @@
 from datetime import UTC, datetime
 from io import StringIO
 
+import pytest
+
+from ai_monitor import cli
 from ai_monitor.cli import SyncUploadResult, run_sync
 from ai_monitor.config import ClientConfig
 from ai_monitor.ingestion.models import ConversationRecord, PromptEventRecord
@@ -111,3 +114,25 @@ def test_run_sync_returns_nonzero_when_upload_fails(tmp_path) -> None:
     assert exit_code == 1
     assert stdout.getvalue() == ""
     assert "upload failed" in stderr.getvalue()
+
+
+def test_sync_entrypoint_shows_help_without_running_sync(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    def fake_run_sync() -> int:
+        calls.append("called")
+        return 0
+
+    monkeypatch.setattr(cli, "run_sync", fake_run_sync)
+    monkeypatch.setattr(cli.sys, "argv", ["ai-monitor-sync", "--help"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        cli.sync_entrypoint()
+
+    captured = capsys.readouterr()
+    assert excinfo.value.code == 0
+    assert calls == []
+    assert "usage: ai-monitor-sync" in captured.out
