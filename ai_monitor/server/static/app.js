@@ -512,22 +512,60 @@ function renderMachineOptions(machines) {
 }
 
 function bindCopyButtons() {
-  for (const button of document.querySelectorAll("[data-copy-text]")) {
+  for (const button of document.querySelectorAll(".setup-copy-button")) {
+    if (button.dataset.copyBound === "true") {
+      continue;
+    }
+    button.dataset.copyBound = "true";
     button.addEventListener("click", async () => {
-      const text = button.getAttribute("data-copy-text");
+      const text = button.closest(".setup-block")?.querySelector("pre")?.textContent;
       if (!text) {
         return;
       }
       try {
-        await navigator.clipboard.writeText(text);
+        await copyText(text);
         button.textContent = "Copied";
         window.setTimeout(() => {
           button.textContent = "Copy";
         }, 1200);
       } catch (error) {
         console.error(error);
+        button.textContent = "Copy failed";
+        window.setTimeout(() => {
+          button.textContent = "Copy";
+        }, 1600);
       }
     });
+  }
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (error) {
+      console.warn("Clipboard API copy failed, falling back to textarea copy.", error);
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.top = "0";
+  textarea.style.left = "-9999px";
+  document.body.append(textarea);
+  textarea.focus();
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+
+  try {
+    if (!document.execCommand("copy")) {
+      throw new Error("document.execCommand('copy') returned false");
+    }
+  } finally {
+    textarea.remove();
   }
 }
 
@@ -552,21 +590,21 @@ function renderMachineSetup(machinePayload) {
     <div class="setup-block">
       <div class="setup-block__header">
         <strong>1. Client image</strong>
-        <button type="button" data-copy-text="${escapeHtml(setup.client_image)}">Copy</button>
+        <button type="button" class="setup-copy-button">Copy</button>
       </div>
       <pre>${escapeHtml(setup.client_image)}</pre>
     </div>
     <div class="setup-block">
       <div class="setup-block__header">
         <strong>2. One-shot Docker command</strong>
-        <button type="button" data-copy-text="${escapeHtml(setup.docker_command)}">Copy</button>
+        <button type="button" class="setup-copy-button">Copy</button>
       </div>
       <pre>${escapeHtml(setup.docker_command)}</pre>
     </div>
     <div class="setup-block">
       <div class="setup-block__header">
         <strong>3. Launch script</strong>
-        <button type="button" data-copy-text="${escapeHtml(setup.launch_script)}">Copy</button>
+        <button type="button" class="setup-copy-button">Copy</button>
       </div>
       <pre>${escapeHtml(setup.launch_script)}</pre>
     </div>
