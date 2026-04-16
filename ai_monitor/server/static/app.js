@@ -1,4 +1,5 @@
 const state = {
+  adminMachinesSignature: "",
   diagnostics: null,
   heatmapMarkup: "",
   latestRefresh: null,
@@ -12,6 +13,9 @@ const state = {
   renderToken: 0,
   tableMarkup: "",
 };
+
+const AUTHENTICATED = document.body.dataset.authenticated === "true";
+const CLIENT_IMAGE = document.body.dataset.clientImage;
 
 const BASE_TABLE_COLUMNS = [
   ["Period", "period_start"],
@@ -214,6 +218,10 @@ function setBusy(isBusy, label = "Scan Local Logs", busyMessage = "") {
   if (refreshButton) {
     refreshButton.disabled = isBusy;
     refreshButton.textContent = isBusy ? label : "Scan Local Logs";
+  }
+  const signOutButton = document.getElementById("sign-out-button");
+  if (signOutButton) {
+    signOutButton.disabled = isBusy;
   }
 
   for (const control of document.querySelectorAll(".segment-button, .filter select")) {
@@ -503,6 +511,128 @@ function renderMachineOptions(machines) {
   }
 }
 
+function bindCopyButtons() {
+  for (const button of document.querySelectorAll("[data-copy-text]")) {
+    button.addEventListener("click", async () => {
+      const text = button.getAttribute("data-copy-text");
+      if (!text) {
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = "Copied";
+        window.setTimeout(() => {
+          button.textContent = "Copy";
+        }, 1200);
+      } catch (error) {
+        console.error(error);
+      }
+    });
+  }
+}
+
+function renderMachineSetup(machinePayload) {
+  const note = document.getElementById("machine-setup-note");
+  const body = document.getElementById("machine-setup-body");
+  if (!note || !body) {
+    return;
+  }
+
+  const { machine, setup, api_key: apiKey } = machinePayload;
+  if (!setup) {
+    note.textContent = `${machine.label} is the server machine. Create a remote machine key to get a Docker client launcher.`;
+    body.innerHTML = "";
+    return;
+  }
+
+  note.textContent = apiKey
+    ? `Key created for ${machine.label}. Copy the script now; it will not be shown again.`
+    : `Docker launch script for ${machine.label}. The API key is hidden after creation.`;
+  body.innerHTML = `
+    <div class="setup-block">
+      <div class="setup-block__header">
+        <strong>1. Client image</strong>
+        <button type="button" data-copy-text="${escapeHtml(setup.client_image)}">Copy</button>
+      </div>
+      <pre>${escapeHtml(setup.client_image)}</pre>
+    </div>
+    <div class="setup-block">
+      <div class="setup-block__header">
+        <strong>2. One-shot Docker command</strong>
+        <button type="button" data-copy-text="${escapeHtml(setup.docker_command)}">Copy</button>
+      </div>
+      <pre>${escapeHtml(setup.docker_command)}</pre>
+    </div>
+    <div class="setup-block">
+      <div class="setup-block__header">
+        <strong>3. Launch script</strong>
+        <button type="button" data-copy-text="${escapeHtml(setup.launch_script)}">Copy</button>
+      </div>
+      <pre>${escapeHtml(setup.launch_script)}</pre>
+    </div>
+  `;
+  bindCopyButtons();
+}
+
+function renderAdminMachines(machinePayloads) {
+  const container = document.getElementById("machine-admin-list");
+  if (!container) {
+    return;
+  }
+  const signature = machinePayloads
+    .map(({ machine, setup }) => `${machine.id}:${machine.label}:${machine.is_active}:${machine.last_refresh_at || ""}:${setup ? setup.client_image : CLIENT_IMAGE}`)
+    .join("\u0000");
+  if (signature === state.adminMachinesSignature) {
+    return;
+  }
+  state.adminMachinesSignature = signature;
+
+  container.innerHTML = machinePayloads.map(({ machine, setup }) => `
+    <article class="machine-card">
+      <div class="machine-card__copy">
+        <strong>${escapeHtml(machine.label)}</strong>
+        <span>${machine.is_local ? "Local machine" : (machine.is_active ? "Active key" : "Revoked")}</span>
+        <small>${escapeHtml(machine.last_refresh_at ? formatTimestamp(machine.last_refresh_at) : "Not refreshed yet")}</small>
+      </div>
+      <div class="machine-card__actions">
+        ${setup ? `<button class="machine-setup-button" data-machine-id="${machine.id}" type="button">Setup</button>` : ""}
+        ${!machine.is_local && machine.is_active ? `<button class="machine-revoke-button" data-machine-id="${machine.id}" type="button">Revoke</button>` : ""}
+      </div>
+    </article>
+  `).join("");
+
+  for (const button of container.querySelectorAll(".machine-setup-button")) {
+    button.addEventListener("click", () => {
+      const payload = machinePayloads.find((entry) => String(entry.machine.id) === button.dataset.machineId);
+      if (payload) {
+        renderMachineSetup(payload);
+      }
+    });
+  }
+
+  for (const button of container.querySelectorAll(".machine-revoke-button")) {
+    button.addEventListener("click", async () => {
+      const response = await fetch(`/api/admin/machines/${button.dataset.machineId}/revoke`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        return;
+      }
+      await loadAdminMachines();
+    });
+  }
+}
+
+async function loadAdminMachines() {
+  const response = await fetch("/api/admin/machines");
+  if (!response.ok) {
+    throw new Error(`Machine list request failed with status ${response.status}`);
+  }
+  const payload = await response.json();
+  renderAdminMachines(payload.machines);
+  return payload.machines;
+}
+
 function renderProjectOptions(projects) {
   const select = document.getElementById("project-filter");
   if (!select) {
@@ -747,14 +877,117 @@ function bindControls() {
 }
 
 async function initializeDashboard() {
+  if (!AUTHENTICATED) {
+    bindLoginForm();
+    return;
+  }
   const shell = document.querySelector(".shell");
   state.latestRefresh = shell?.dataset.lastRefresh || null;
   bindControls();
+  bindAdminControls();
   setStatusNote(defaultStatusNote());
   const payload = await loadMetrics();
+  await loadAdminMachines();
   if (!payload?.refresh) {
     await refreshData({ automatic: true });
   }
+}
+
+function bindLoginForm() {
+  const form = document.getElementById("login-form");
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const input = document.getElementById("admin-key-input");
+    const note = document.getElementById("login-note");
+    const submit = document.getElementById("login-submit");
+    if (!(input instanceof HTMLInputElement) || !(submit instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    submit.disabled = true;
+    if (note) {
+      note.textContent = "Signing in...";
+    }
+
+    try {
+      const response = await fetch("/api/session/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admin_key: input.value }),
+      });
+      if (!response.ok) {
+        throw new Error(`Login failed with status ${response.status}`);
+      }
+      const payload = await response.json();
+      if (!payload.authenticated) {
+        throw new Error("Invalid admin key");
+      }
+      window.location.reload();
+    } catch (error) {
+      console.error(error);
+      if (note) {
+        note.textContent = "Sign-in failed. Check the admin key and try again.";
+      }
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+function bindAdminControls() {
+  document.getElementById("sign-out-button")?.addEventListener("click", async () => {
+    await fetch("/api/session/logout", { method: "POST" });
+    window.location.reload();
+  });
+
+  const form = document.getElementById("machine-create-form");
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const input = document.getElementById("machine-label-input");
+    const note = document.getElementById("machine-create-note");
+    const button = document.getElementById("machine-create-button");
+    if (!(input instanceof HTMLInputElement) || !(button instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    button.disabled = true;
+    if (note) {
+      note.textContent = "Creating machine key...";
+    }
+
+    try {
+      const response = await fetch("/api/admin/machines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: input.value.trim() }),
+      });
+      if (!response.ok) {
+        throw new Error(`Machine create failed with status ${response.status}`);
+      }
+      const payload = await response.json();
+      await loadAdminMachines();
+      renderMachineSetup(payload);
+      input.value = "";
+      if (note) {
+        note.textContent = `Created machine key for ${payload.machine.label}. Copy the Docker launcher now.`;
+      }
+    } catch (error) {
+      console.error(error);
+      if (note) {
+        note.textContent = "Could not create the machine key. Try a different label.";
+      }
+    } finally {
+      button.disabled = false;
+    }
+  });
 }
 
 void initializeDashboard();

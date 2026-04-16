@@ -7,8 +7,12 @@
     <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}" type="image/svg+xml" />
     <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}" />
   </head>
-  <body>
+  <body
+    data-authenticated="{{ 'true' if authenticated else 'false' }}"
+    data-client-image="{{ client_image }}"
+  >
     <div class="backdrop"></div>
+    {% if authenticated %}
     <main
       class="shell"
       data-last-refresh="{{ last_refreshed_at or '' }}"
@@ -31,6 +35,7 @@
             <strong id="last-refresh">{{ last_refreshed_at or "Not refreshed yet" }}</strong>
           </div>
           <button id="refresh-button" type="button">Scan Local Logs</button>
+          <button id="sign-out-button" type="button">Sign Out</button>
           <p aria-atomic="true" aria-live="polite" id="status-note" class="status-note" role="status">
             {{ "Showing the latest local read." if last_refreshed_at else "No local read yet. The page will build one for you." }}
           </p>
@@ -105,6 +110,42 @@
             <span>Slash Cmds</span>
           </span>
         </p>
+      </section>
+
+      <section class="admin-panel panel" aria-label="Machine access">
+        <div class="panel-heading">
+          <h2>Machine Access</h2>
+          <p>
+            Create one key per remote machine, then run the Docker client launcher from that
+            machine. The key is shown only once when you mint it.
+          </p>
+        </div>
+        <form class="machine-create-form" id="machine-create-form">
+          <label class="filter">
+            <span>New Machine Label</span>
+            <input
+              id="machine-label-input"
+              name="label"
+              type="text"
+              placeholder="work-laptop"
+              required
+            />
+          </label>
+          <button id="machine-create-button" type="submit">Create Machine Key</button>
+          <p aria-live="polite" class="status-note" id="machine-create-note" role="status">
+            Mint one key per machine. Revoke and recreate if a key is lost.
+          </p>
+        </form>
+        <div class="machine-admin-grid">
+          <div class="machine-admin-list" id="machine-admin-list"></div>
+          <aside class="machine-setup-panel" id="machine-setup-panel">
+            <h3>Client Setup</h3>
+            <p id="machine-setup-note">
+              Choose a machine to view the sync instructions, or create a new machine key.
+            </p>
+            <div id="machine-setup-body"></div>
+          </aside>
+        </div>
       </section>
 
       <section aria-busy="false" class="workspace" id="workspace">
@@ -190,6 +231,30 @@
         </div>
       </section>
     </main>
+    {% else %}
+    <main class="shell shell--login">
+      <section class="login-panel panel" aria-label="Admin sign in">
+        <div class="panel-heading">
+          <p class="eyebrow">Admin Access</p>
+          <h1 class="login-title">
+            <span>AI</span>
+            <span>Monitor</span>
+          </h1>
+          <p class="lede">Sign in with the admin key to view the dashboard and manage machines.</p>
+        </div>
+        <form class="login-form" id="login-form">
+          <label class="filter login-field">
+            <span>Admin Key</span>
+            <input id="admin-key-input" name="admin_key" type="password" autocomplete="current-password" required />
+          </label>
+          <button id="login-submit" type="submit">Sign In</button>
+          <p aria-live="polite" class="status-note" id="login-note" role="status">
+            Enter the admin key configured on the server.
+          </p>
+        </form>
+      </section>
+    </main>
+    {% endif %}
     <script src="{{ url_for('static', path='app.js') }}" defer></script>
   </body>
 </html>

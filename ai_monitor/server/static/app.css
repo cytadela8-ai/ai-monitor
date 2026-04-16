@@ -401,12 +401,19 @@ h2 {
 
 #refresh-button,
 .segment-button,
-.filter select {
+.filter select,
+.login-form input,
+.machine-create-form input {
   font: inherit;
 }
 
 #refresh-button,
-.segment-button {
+.segment-button,
+#sign-out-button,
+#login-submit,
+#machine-create-button,
+.machine-card__actions button,
+.setup-block__header button {
   border: 0;
   cursor: pointer;
   transition:
@@ -423,6 +430,18 @@ h2 {
   color: var(--accent-ink);
   font-weight: 700;
   box-shadow: 0 10px 24px -24px rgba(29, 29, 24, 0.9);
+}
+
+#sign-out-button,
+#login-submit,
+#machine-create-button,
+.machine-card__actions button,
+.setup-block__header button {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-strong) 92%, white);
+  color: var(--ink);
+  border: 1px solid var(--surface-border);
 }
 
 .segment-button {
@@ -452,6 +471,18 @@ h2 {
 
 .filter select {
   width: 180px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--surface-border));
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.96), rgba(251, 246, 234, 0.9));
+  color: var(--ink);
+}
+
+.login-form input,
+.machine-create-form input {
+  width: 100%;
   min-width: 0;
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--surface-border));
@@ -495,6 +526,106 @@ h2 {
   background:
     linear-gradient(180deg, rgba(255, 252, 246, 0.97), rgba(253, 247, 235, 0.92));
   box-shadow: 0 18px 34px -32px rgba(82, 58, 17, 0.34);
+}
+
+.shell--login {
+  width: min(560px, calc(100% - 32px));
+  padding-top: 72px;
+}
+
+.login-panel,
+.admin-panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--surface-border) 94%, var(--page-pop));
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.97), rgba(253, 247, 235, 0.92));
+}
+
+.login-title {
+  max-width: 7ch;
+  font-size: clamp(2.6rem, 7vw, 4.6rem);
+}
+
+.login-form,
+.machine-create-form {
+  display: grid;
+  gap: 12px;
+}
+
+.machine-create-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.machine-create-form .status-note {
+  grid-column: 1 / -1;
+}
+
+.machine-admin-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.2fr);
+  gap: 16px;
+}
+
+.machine-admin-list,
+.machine-setup-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.machine-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-muted) 80%, rgba(255, 248, 228, 0.92));
+}
+
+.machine-card__copy {
+  display: grid;
+  gap: 4px;
+}
+
+.machine-card__copy span,
+.machine-card__copy small {
+  color: var(--muted);
+}
+
+.machine-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: start;
+  justify-content: end;
+}
+
+.setup-block {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-muted) 72%, rgba(255, 248, 228, 0.86));
+}
+
+.setup-block__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.setup-block pre {
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 0.9rem/1.5 "SFMono-Regular", Consolas, monospace;
 }
 
 .summary-band__heading {
@@ -954,6 +1085,10 @@ td {
     align-items: stretch;
   }
 
+  .machine-admin-grid {
+    grid-template-columns: 1fr;
+  }
+
   .filter-row {
     justify-content: start;
   }
@@ -996,6 +1131,10 @@ td {
   .filter-row {
     width: 100%;
     display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .machine-create-form {
     grid-template-columns: 1fr;
   }
 

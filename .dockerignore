@@ -1,0 +1,15 @@
+.env
+.git
+.github
+.playwright-mcp
+.pytest_cache
+.ruff_cache
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.png
+ai_monitor.db
+docs/
+tests/

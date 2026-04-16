@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
 from ai_monitor.config import AppConfig
 from ai_monitor.db.schema import ensure_database
@@ -22,6 +23,13 @@ def create_app(config: AppConfig | None = None) -> FastAPI:
     server_root = Path(__file__).resolve().parent
     ensure_database(app_config.database_path)
     app = FastAPI(title="AI Monitor")
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=app_config.session_secret,
+        session_cookie="ai_monitor_admin_session",
+        max_age=60 * 60 * 24 * 30,
+        same_site="lax",
+    )
     app.add_middleware(GZipMiddleware, minimum_size=500)
     app.state.config = app_config
     app.state.static_path = server_root / "static"

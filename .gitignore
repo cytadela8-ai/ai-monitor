@@ -6,3 +6,5 @@ __pycache__/
 *.pyc
 ai_monitor.db
 .playwright-mcp/
+.env
+data/

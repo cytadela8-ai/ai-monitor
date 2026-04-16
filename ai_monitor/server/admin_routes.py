@@ -1,7 +1,9 @@
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict
 
-from ai_monitor.machines import create_machine, list_machines, revoke_machine
+from ai_monitor.auth import require_admin_session
+from ai_monitor.machines import MachineRecord, create_machine, list_machines, revoke_machine
+from ai_monitor.server.client_setup import build_client_setup
 
 router = APIRouter(prefix="/api/admin")
 
@@ -12,32 +14,45 @@ class CreateMachineRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-def _require_admin(request: Request) -> None:
-    header = request.headers.get("Authorization", "")
-    if not header.startswith("Bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
-    if header.removeprefix("Bearer ").strip() != request.app.state.config.admin_key:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin token")
+def _machine_response(
+    request: Request,
+    machine: MachineRecord,
+    api_key: str | None = None,
+) -> dict[str, object]:
+    server_url = str(request.base_url).rstrip("/")
+    setup = None
+    if not machine.is_local:
+        setup = build_client_setup(
+            server_url=server_url,
+            client_image=request.app.state.config.client_image,
+            api_key=api_key,
+        ).to_dict()
+    return {
+        "machine": machine.__dict__,
+        "setup": setup,
+    }
 
 
 @router.get("/machines")
 def get_machines(request: Request) -> dict[str, object]:
-    _require_admin(request)
+    require_admin_session(request)
     machines = list_machines(request.app.state.config.database_path)
-    return {"machines": [machine.__dict__ for machine in machines]}
+    return {"machines": [_machine_response(request, machine) for machine in machines]}
 
 
 @router.post("/machines", status_code=status.HTTP_201_CREATED)
 def post_machine(request: Request, payload: CreateMachineRequest) -> dict[str, object]:
-    _require_admin(request)
+    require_admin_session(request)
     machine, api_key = create_machine(request.app.state.config.database_path, payload.label)
-    return {"machine": machine.__dict__, "api_key": api_key}
+    response = _machine_response(request, machine, api_key)
+    response["api_key"] = api_key
+    return response
 
 
 @router.post("/machines/{machine_id}/revoke")
 def post_revoke_machine(request: Request, machine_id: int) -> dict[str, object]:
-    _require_admin(request)
+    require_admin_session(request)
     machine = revoke_machine(request.app.state.config.database_path, machine_id)
     if machine is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Machine not found")
-    return {"machine": machine.__dict__}
+    return _machine_response(request, machine)

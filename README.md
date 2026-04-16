@@ -16,6 +16,9 @@ per-machine API keys.
 uv sync --dev
 ```
 
+Both `ai-monitor-server` and `ai-monitor-sync` automatically load a `.env` file from the current
+working directory. Process environment variables still override values from `.env`.
+
 ## Server Mode
 
 ```bash
@@ -25,14 +28,27 @@ uv run ai-monitor-server
 
 The server entry point:
 
-- serves the dashboard and JSON APIs
+- serves the login screen, authenticated dashboard, and JSON APIs
 - reads the local machine's logs into the `main-server` machine slot by default
-- exposes admin endpoints for minting and revoking machine API keys
+- lets you sign in with the admin key and manage remote machine keys from the UI
 - accepts authenticated snapshot uploads from remote machines
 
-Set `AI_MONITOR_ADMIN_KEY` before exposing the server anywhere beyond your own machine.
+Set `AI_MONITOR_ADMIN_KEY` and `AI_MONITOR_SESSION_SECRET` before exposing the server anywhere
+beyond your own machine.
 
 If port `8000` is already in use, set a different `AI_MONITOR_PORT`.
+
+## Dashboard Sign-In And Machine Provisioning
+
+Open the main instance in a browser and sign in with `AI_MONITOR_ADMIN_KEY`.
+
+After sign-in, the dashboard includes a `Machine Access` panel where you can:
+
+- create a machine key for a remote machine
+- revoke a machine key
+- view copyable setup instructions for running sync from that machine
+
+When you create a machine key, copy it immediately. The plaintext key is shown only once.
 
 ## Client Mode
 
@@ -48,15 +64,67 @@ Set these client variables first:
 - `AI_MONITOR_API_KEY`
 - local provider paths if they differ from the defaults
 
-The sync command reads local logs, builds a normalized snapshot, uploads it to the main instance,
-prints one summary line, and exits. It is designed for cron or systemd timers rather than running
-its own scheduler.
+The easiest way to provision `AI_MONITOR_API_KEY` is from the `Machine Access` panel on the main
+instance.
 
-Example cron entry:
+The sync command reads local logs, builds a normalized snapshot, uploads it to the main instance,
+prints one summary line, and exits.
+
+## Docker
+
+Build the server image:
 
 ```bash
-0 * * * * cd /path/to/ai-monitor && uv run ai-monitor-sync
+docker build -t ai-monitor .
 ```
+
+Run the server with an env file and a persistent database mount:
+
+```bash
+docker run --rm \
+  -p 8000:8000 \
+  --env-file .env \
+  -e AI_MONITOR_DATABASE_PATH=/data/ai_monitor.db \
+  -v "$(pwd)/data:/data" \
+  ai-monitor
+```
+
+If the server container should also scan the host machine's local Claude and Codex logs, mount
+those directories read-only and point the env vars at the mounted paths.
+
+For remote machines, the admin panel now renders a Docker-only launch script that uses the client
+image configured by `AI_MONITOR_CLIENT_IMAGE`. The published client image path is
+`ghcr.io/cytadela8-ai/ai-monitor-client:latest`.
+
+## Docker Compose On This Machine
+
+This repo now includes a local `compose.yml` and a real `.env` for Docker-based server runs on
+this machine.
+
+Bring the server up:
+
+```bash
+docker compose up -d --build
+```
+
+The compose setup mounts:
+
+- `./data` to persist the SQLite database
+- `${HOME}/.claude` read-only to `/host-home/.claude`
+- `${HOME}/.codex` read-only to `/host-home/.codex`
+
+The checked-in `.env.example` remains the template, while the local `.env` is configured for the
+container and ignored by git.
+
+## Container Publishing
+
+GitHub Actions publishes a server image to `ghcr.io/<owner>/<repo>` on:
+
+- pushes to `main`
+- version tags matching `v*`
+
+GitHub Actions also publishes a client image to `ghcr.io/<owner>/<repo>-client` with the same
+tag set: `main`, `latest`, commit SHA, and semver release tags.
 
 Then open `http://127.0.0.1:8000` or the host and port you configured. The app initializes the
 SQLite schema automatically. If the cache is empty, the page loads immediately and starts the
@@ -88,7 +156,10 @@ sources that are present.
 
 ## API Endpoints
 
-- `GET /` dashboard
+- `GET /` login page or dashboard shell
+- `GET /api/session`
+- `POST /api/session/login`
+- `POST /api/session/logout`
 - `GET /api/metrics?period=day|week|month&machine=<label>`
 - `POST /api/refresh`
 - `GET /api/admin/machines`

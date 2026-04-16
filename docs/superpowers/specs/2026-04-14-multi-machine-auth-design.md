@@ -3,22 +3,26 @@
 ## Goal
 
 Extend AI Monitor so one main instance can aggregate usage from multiple machines. The main
-instance serves the dashboard, stores data for all machines, authenticates remote uploads with API
-keys, and supports filtering metrics by machine.
+instance serves the dashboard, stores data for all machines, requires admin sign-in for the whole
+dashboard, authenticates remote uploads with machine API keys, and supports filtering metrics by
+machine.
 
 ## Non-Goals
 
 - No background scheduler inside the application
-- No dashboard login flow for human viewers
 - No raw-log uploads to the server
 - No incremental sync protocol
 - No push-triggered refresh of remote machines from the server
+- No multi-user role model beyond one admin secret
 
 ## User Requirements
 
 - The main instance must accept usage data from different machines
 - Each remote machine must authenticate with an API key
 - API keys must be manageable from the main instance after bootstrap
+- The whole dashboard must require admin sign-in
+- Admin sign-in must persist in the browser across refreshes and later visits
+- The dashboard must include a UI for creating, revoking, and viewing machine setup details
 - Remote machines must run as a CLI-only sync client and must not run an HTTP server
 - Sync must be safe under retries, refreshes, and local re-parsing
 - The dashboard must support filtering by machine
@@ -26,11 +30,11 @@ keys, and supports filtering metrics by machine.
 
 ## Architecture
 
-The system gains two explicit runtime entry points:
+The system has two explicit runtime entry points:
 
 1. Server entry point
    - starts the FastAPI app
-   - serves the dashboard and JSON APIs
+   - serves the login screen, authenticated dashboard, and JSON APIs
    - ingests local logs for the server machine
    - accepts authenticated snapshot uploads from remote machines
 2. Client entry point
@@ -50,7 +54,7 @@ The ingestion boundary remains intact:
 
 Machine identity is the machine API key.
 
-- Each machine gets exactly one active machine key
+- Each remote machine gets exactly one active machine key
 - The key determines which machine slice a snapshot replaces
 - Machine metadata stores a human-readable label for filtering and status display
 - Revoking a key disables future uploads from that machine without removing historical data
@@ -59,12 +63,24 @@ Two auth classes exist:
 
 1. Bootstrap admin key
    - configured by environment variable on the server
-   - used to mint and revoke machine keys
+   - used to sign in to the dashboard
+   - used to mint and revoke machine keys through the UI and admin APIs
 2. Machine API keys
    - minted by the server
    - shown once at creation time
    - stored as secure hashes
    - used only for machine snapshot uploads
+
+### Admin Browser Session
+
+The server issues a signed HTTP-only cookie after a successful admin login.
+
+- entering the admin key once creates the session
+- the session cookie is used for all dashboard page and dashboard API requests
+- the session persists across page reloads and later browser visits until logout or expiry
+- logout clears the cookie
+
+The admin key itself must not live in browser JavaScript storage.
 
 ## Sync Model
 
@@ -86,11 +102,11 @@ This choice is intentional:
 
 ## Storage Model
 
-The database becomes machine-scoped.
+The database is machine-scoped.
 
 ### Machines
 
-Add a `machines` table with:
+`machines` stores:
 
 - `id`
 - `label`
@@ -106,16 +122,15 @@ Add a `machines` table with:
 
 ### Refresh Runs
 
-Replace the single global refresh history with machine-scoped refresh history:
+`machine_refresh_runs` stores:
 
-- `machine_refresh_runs`
-  - `id`
-  - `machine_id`
-  - `refreshed_at`
-  - `refresh_source`
-  - `provider_count`
-  - `conversation_count`
-  - `prompt_event_count`
+- `id`
+- `machine_id`
+- `refreshed_at`
+- `refresh_source`
+- `provider_count`
+- `conversation_count`
+- `prompt_event_count`
 
 ### Normalized Tables
 
@@ -137,6 +152,7 @@ Refresh is no longer global.
 ### Server local refresh
 
 - triggered by `POST /api/refresh`
+- requires admin session
 - rebuilds only the local server machine's slice from local files
 - does not touch remote machine data
 
@@ -153,37 +169,52 @@ This prevents one machine from deleting or stale-overwriting another machine's d
 
 ### Existing Endpoints
 
+- `GET /`
+  - returns the login screen when signed out
+  - returns the dashboard shell when signed in
 - `GET /api/metrics`
-  - add `machine` query parameter
-  - include machine filter options in the response
+  - requires admin session
+  - adds `machine` query parameter
+  - includes machine filter options in the response
 - `POST /api/refresh`
+  - requires admin session
   - refreshes only the local server machine
 
-### New Admin Endpoints
+### Session Endpoints
+
+- `POST /api/session/login`
+  - validates the bootstrap admin key
+  - sets the signed admin session cookie
+- `POST /api/session/logout`
+  - clears the session cookie
+- `GET /api/session`
+  - returns current sign-in status for the browser
+
+### Admin Endpoints
 
 - `GET /api/admin/machines`
-  - bootstrap-admin authenticated
+  - admin-session authenticated
   - returns machine metadata and status
 - `POST /api/admin/machines`
-  - bootstrap-admin authenticated
+  - admin-session authenticated
   - creates a new machine record and returns the plaintext API key once
 - `POST /api/admin/machines/{machine_id}/revoke`
-  - bootstrap-admin authenticated
+  - admin-session authenticated
   - marks the machine key inactive
 
-### New Ingest Endpoint
+### Ingest Endpoint
 
 - `POST /api/ingest/snapshot`
   - machine authenticated
   - accepts a full normalized snapshot
   - replaces only the authenticated machine's data
 
-The upload body should contain normalized records and generation metadata only. The authenticated
-key decides the target machine. The request body must not be trusted to choose the machine.
+The upload body contains normalized records and generation metadata only. The authenticated key
+decides the target machine. The request body must not be trusted to choose the machine.
 
 ## Client CLI Design
 
-The client must not expose a web server. It gets its own entry point and command surface.
+The client does not expose a web server. It gets its own entry point and command surface.
 
 Recommended commands:
 
@@ -237,9 +268,18 @@ The diagnostics rail should expose:
 - total known machines
 - most recent refresh metadata
 
+The authenticated dashboard also gains an admin operations surface:
+
+- sign-in form when not authenticated
+- sign-out action when authenticated
+- machine registry panel with create and revoke actions
+- one-time display of the newly minted machine API key
+- setup instructions for each machine, including required environment variables, sync command, and
+  cron example
+
 ## Config Model
 
-Server and client runtime behavior should be selected by entry point, not by a shared mode flag.
+Server and client runtime behavior are selected by entry point, not by a shared mode flag.
 
 ### Server config
 
@@ -247,6 +287,7 @@ Server and client runtime behavior should be selected by entry point, not by a s
 - local provider paths
 - bootstrap admin key
 - local machine label
+- session signing secret or derivation source
 
 ### Client config
 
@@ -258,10 +299,9 @@ Example env files should document both sets of settings.
 
 ## Module Layout
 
-Add focused modules instead of overloading the current files.
-
 - `ai_monitor/auth.py`
   - key hashing
+  - admin session helpers
   - bearer-token lookup helpers
 - `ai_monitor/machines.py`
   - machine CRUD
@@ -273,7 +313,7 @@ Add focused modules instead of overloading the current files.
 - `ai_monitor/cli.py`
   - CLI entry points and argument parsing
 - `ai_monitor/server/admin_routes.py`
-  - admin-authenticated machine management APIs
+  - admin-session machine management APIs
 - `ai_monitor/server/ingest_routes.py`
   - machine-authenticated snapshot ingest API
 
@@ -285,13 +325,16 @@ Extend:
 - `ai_monitor/ingestion/service.py`
 - `ai_monitor/server/app.py`
 - `ai_monitor/server/routes.py`
-- `ai_monitor/server/static/app.js`
 - `ai_monitor/server/templates/index.html`
+- `ai_monitor/server/static/app.css`
+- `ai_monitor/server/static/app.js`
 
 ## Error Handling
 
-- invalid admin or machine bearer tokens return `401`
-- revoked machine keys return `403`
+- invalid admin login returns `401`
+- missing admin session on dashboard APIs returns `401`
+- missing admin session on `GET /` returns the login page instead of dashboard data
+- invalid or revoked machine keys return `401` or `403` as appropriate
 - malformed snapshot payloads return `422`
 - snapshot replacement failures roll back the whole transaction
 - client CLI failures include operation context and exit nonzero
@@ -300,16 +343,11 @@ Extend:
 
 ## Testing Strategy
 
-### Database And Query Tests
-
-- machine-scoped inserts and replacements
-- all-machine aggregation correctness
-- machine filter correctness
-- local machine refresh isolation
-
 ### API Tests
 
-- admin auth enforcement
+- login success and failure behavior
+- protected dashboard and API behavior without a session
+- session persistence across multiple requests from the same client
 - machine-key minting and revoke behavior
 - snapshot upload auth enforcement
 - snapshot upload replaces only the authenticated machine's data
@@ -323,6 +361,9 @@ Extend:
 
 ### Frontend Tests
 
+- login form rendering when signed out
+- authenticated dashboard rendering when signed in
+- admin machine-management panel rendering
 - machine filter options render
 - selected machine is carried into metrics requests
 - all-machines mode renders machine column
@@ -332,13 +373,15 @@ Extend:
 Update:
 
 - `README.md`
+  - admin sign-in
   - server setup
   - machine key minting
   - client sync usage
   - cron example
 - `DEV.md`
   - machine-scoped storage
-  - auth and admin modules
+  - auth and session flow
+  - admin UI module boundaries
   - entry-point split
 - `.env.example`
   - server and client variables

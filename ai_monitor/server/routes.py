@@ -1,6 +1,13 @@
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, ConfigDict
 
+from ai_monitor.auth import (
+    clear_admin_session,
+    has_admin_session,
+    require_admin_session,
+    sign_in_admin_session,
+)
 from ai_monitor.db.queries import (
     fetch_daily_heatmap,
     fetch_latest_refresh_run,
@@ -13,6 +20,12 @@ from ai_monitor.db.queries import (
 router = APIRouter()
 
 
+class LoginRequest(BaseModel):
+    admin_key: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
 @router.get("/api/metrics")
 def get_metrics(
     request: Request,
@@ -21,6 +34,7 @@ def get_metrics(
     project: str | None = Query(default=None),
     provider: str | None = Query(default=None),
 ) -> dict[str, object]:
+    require_admin_session(request)
     config = request.app.state.config
     last_refresh = fetch_latest_refresh_run(config.database_path, machine=machine)
     rows = fetch_metrics_rows(
@@ -65,6 +79,7 @@ def get_metrics(
 
 @router.post("/api/refresh")
 def refresh_metrics(request: Request) -> dict[str, object]:
+    require_admin_session(request)
     report = request.app.state.ingestion_service.refresh_machine(request.app.state.local_machine.id)
     return {
         "last_refreshed_at": report.refreshed_at.isoformat(),
@@ -74,6 +89,25 @@ def refresh_metrics(request: Request) -> dict[str, object]:
         "conversation_count": report.conversation_count,
         "prompt_event_count": report.prompt_event_count,
     }
+
+
+@router.get("/api/session")
+def get_session_status(request: Request) -> dict[str, bool]:
+    return {"authenticated": has_admin_session(request)}
+
+
+@router.post("/api/session/login")
+def login_session(request: Request, payload: LoginRequest) -> dict[str, bool]:
+    if payload.admin_key != request.app.state.config.admin_key:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin key")
+    sign_in_admin_session(request)
+    return {"authenticated": True}
+
+
+@router.post("/api/session/logout")
+def logout_session(request: Request) -> dict[str, bool]:
+    clear_admin_session(request)
+    return {"authenticated": False}
 
 
 @router.get("/health")
@@ -90,6 +124,16 @@ def favicon(request: Request) -> FileResponse:
 @router.get("/")
 def dashboard(request: Request) -> object:
     templates = request.app.state.templates
+    if not has_admin_session(request):
+        return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={
+                "authenticated": False,
+                "client_image": request.app.state.config.client_image,
+                "last_refreshed_at": None,
+            },
+        )
     last_refresh = fetch_latest_refresh_run(
         request.app.state.config.database_path,
         machine=request.app.state.local_machine.label,
@@ -98,6 +142,8 @@ def dashboard(request: Request) -> object:
         request=request,
         name="index.html",
         context={
+            "authenticated": True,
+            "client_image": request.app.state.config.client_image,
             "last_refreshed_at": None if last_refresh is None else last_refresh.refreshed_at,
         },
     )

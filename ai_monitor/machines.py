@@ -1,8 +1,8 @@
 import sqlite3
-from typing import Any
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from ai_monitor.auth import generate_api_key, hash_api_key
 from ai_monitor.db.schema import ensure_database

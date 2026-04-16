@@ -1,0 +1,16 @@
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_ROOT_USER_ACTION=ignore
+
+WORKDIR /app
+
+COPY pyproject.toml README.md uv.lock ./
+COPY ai_monitor ./ai_monitor
+
+RUN python -m pip install --no-cache-dir .
+
+EXPOSE 8000
+
+CMD ["ai-monitor-server"]

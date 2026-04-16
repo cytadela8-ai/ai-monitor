@@ -65,6 +65,14 @@ tests/
 - Remote sync replaces only the authenticated remote machine slice.
 - The dashboard can show all machines together or filter down to one machine label.
 
+## Session Auth
+
+- The whole dashboard requires admin sign-in.
+- `AI_MONITOR_ADMIN_KEY` is the root credential for browser sign-in.
+- The server sets a signed HTTP-only session cookie after successful login.
+- Dashboard APIs and admin APIs require that session cookie.
+- Remote snapshot ingest stays machine-key based and does not use the admin session.
+
 ## Provider Boundaries
 
 - `ClaudeProvider` reads Claude history and emits normalized conversations and prompt events.
@@ -77,16 +85,35 @@ tests/
 ## Auth And Entry Points
 
 - `ai-monitor-server` starts the FastAPI app and uses the bootstrap admin key from config to guard
-  machine-management APIs.
+  dashboard sign-in and machine-management APIs.
 - `ai-monitor-sync` is a CLI-only entry point. It never runs an HTTP listener.
+- `ai_monitor.config` automatically loads `.env` from the current working directory before reading
+  server or client configuration, while keeping explicit process env values higher priority.
 - `ai_monitor.auth` hashes generated machine keys.
+- `ai_monitor.auth` also manages admin session helpers.
 - `ai_monitor.machines` owns local machine creation, machine-key minting, revoke operations, and
   machine-key authentication.
+
+## Packaging And CI
+
+- `Dockerfile` builds a server-only image and defaults to `ai-monitor-server`.
+- `Dockerfile.client` builds a client-only image and defaults to `ai-monitor-sync`.
+- `.dockerignore` keeps local databases, tests, screenshots, and caches out of the image context.
+- `compose.yml` is the local Docker launch path for this machine. It mounts the host Claude and
+  Codex directories read-only and persists the SQLite database in `./data`.
+- `ai_monitor.server.client_setup` builds the Docker client command and launcher script shown in
+  the admin panel.
+- `scripts/run-client-sync.sh` is the shell version of the same Docker-only client launch flow.
+- `.github/workflows/publish-image.yml` publishes the Docker image to GHCR on pushes to `main`
+  and tags matching `v*`, for both server and client images.
 
 ## Dashboard Notes
 
 - The main surface is the project usage ledger. Totals, heatmap, and diagnostics are secondary
   support views rather than separate dashboard cards.
+- Signed-out users see a login screen instead of the dashboard shell.
+- Signed-in users also get a `Machine Access` panel for provisioning remote machines and copying
+  sync instructions.
 - The toolbar now includes a machine filter. In the all-machines view, the ledger includes a
   machine column so combined rows stay intelligible.
 - `GET /api/metrics` also returns ranked project options for the current period/provider context so

@@ -9,11 +9,9 @@ def test_snapshot_ingest_requires_machine_auth(client: TestClient) -> None:
 
 def test_snapshot_ingest_replaces_only_authenticated_machine_slice(
     client: TestClient,
-    admin_headers: dict[str, str],
 ) -> None:
     create_response = client.post(
         "/api/admin/machines",
-        headers=admin_headers,
         json={"label": "work-laptop"},
     )
     api_key = create_response.json()["api_key"]

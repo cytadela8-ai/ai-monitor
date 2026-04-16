@@ -1,6 +1,14 @@
 from fastapi.testclient import TestClient
 
 
+def test_metrics_endpoint_requires_session(
+    unauthenticated_client: TestClient,
+) -> None:
+    response = unauthenticated_client.get("/api/metrics", params={"period": "day"})
+
+    assert response.status_code == 401
+
+
 def test_metrics_endpoint_returns_selected_period_data(client: TestClient) -> None:
     response = client.get("/api/metrics", params={"period": "week"})
 
@@ -115,11 +123,9 @@ def test_metrics_endpoint_returns_machine_options(client: TestClient) -> None:
 
 def test_metrics_endpoint_filters_to_requested_machine(
     client: TestClient,
-    admin_headers: dict[str, str],
 ) -> None:
     create_response = client.post(
         "/api/admin/machines",
-        headers=admin_headers,
         json={"label": "work-laptop"},
     )
     api_key = create_response.json()["api_key"]

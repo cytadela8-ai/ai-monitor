@@ -1,0 +1,12 @@
+services:
+  ai-monitor:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+      - ${HOME}/.claude:/host-home/.claude:ro
+      - ${HOME}/.codex:/host-home/.codex:ro
